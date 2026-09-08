@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --night: #050810;
+  --panel-border: rgba(148, 163, 196, 0.14);
+}
+
+html {
+  background: var(--night);
+}
+
+body {
+  background: var(--night);
+  color: #f4f6fa;
+  position: relative;
+  min-height: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+::selection {
+  background: #2fb8e0;
+  color: #04101b;
+}
+
+/* ==========================================================================
+   THE AURORA — a fixed, slow-drifting field of brand-colour light behind
+   every section of the page, not just the hero. This is the single biggest
+   lever for "premium": a black void with cards on it reads cheap no matter
+   how good the cards are; a page with real, considered light in it reads
+   expensive even with simple components.
+   ========================================================================== */
+.aurora-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora-field::before,
+.aurora-field::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(110px);
+  opacity: 0.22;
+  mix-blend-mode: screen;
+}
+.aurora-field::before {
+  width: 60vw;
+  height: 60vw;
+  max-width: 880px;
+  max-height: 880px;
+  top: -20vw;
+  right: -16vw;
+  background: radial-gradient(circle at 35% 35%, #2fb8e0 0%, #3c64c8 45%, transparent 72%);
+  animation: auroraDriftA 30s ease-in-out infinite;
+}
+.aurora-field::after {
+  width: 48vw;
+  height: 48vw;
+  max-width: 720px;
+  max-height: 720px;
+  bottom: -18vw;
+  left: -12vw;
+  background: radial-gradient(circle at 60% 40%, #e23a3a 0%, #2e3f8c 48%, transparent 74%);
+  animation: auroraDriftB 36s ease-in-out infinite;
+}
+.aurora-blob-3 {
+  position: absolute;
+  width: 34vw;
+  height: 34vw;
+  max-width: 520px;
+  max-height: 520px;
+  top: 42%;
+  left: 50%;
+  border-radius: 50%;
+  filter: blur(130px);
+  opacity: 0.14;
+  mix-blend-mode: screen;
+  background: radial-gradient(circle, #7cc24a 0%, transparent 72%);
+  animation: auroraDriftC 44s ease-in-out infinite;
+}
+@keyframes auroraDriftA {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-4%, 5%) scale(1.08); }
+}
+@keyframes auroraDriftB {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(5%, -4%) scale(1.1); }
+}
+@keyframes auroraDriftC {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-46%, -54%) scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aurora-field::before, .aurora-field::after, .aurora-blob-3 { animation: none; }
+}
+@media (max-width: 768px) {
+  .aurora-field::before, .aurora-field::after { filter: blur(60px); opacity: 0.45; }
+}
+
+/* fine grain over the whole page, softens every gradient so nothing bands */
+.grain-overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ==========================================================================
+   Glass surfaces — every card/panel on the page shares this language:
+   translucent, blurred, a hairline border that catches light, never a flat
+   opaque box. This is what makes the aurora behind it feel connected to
+   the content instead of stuck behind it.
+   ========================================================================== */
+.glass {
+  background: linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015));
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 1px 0 0 rgba(255,255,255,0.05) inset, 0 24px 60px -24px rgba(0,0,0,0.55);
+}
+.glass-strong {
+  background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.025));
+  backdrop-filter: blur(26px);
+  -webkit-backdrop-filter: blur(26px);
+  border: 1px solid rgba(148, 163, 196, 0.22);
+  box-shadow: 0 1px 0 0 rgba(255,255,255,0.06) inset, 0 30px 70px -26px rgba(0,0,0,0.6);
+}
+
+.grad-text {
+  background-image: linear-gradient(120deg, #7ea6ff 0%, #3c64c8 35%, #2fb8e0 70%, #7cc24a 100%);
+  background-size: 220% 220%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradientShift 7s ease-in-out infinite;
+}
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.glow-cyan { box-shadow: 0 0 0 1px rgba(47,184,224,0.35), 0 12px 40px -8px rgba(47,184,224,0.35); }
+
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* section rhythm — used instead of ad hoc py-16 scattered through components */
+.section-pad { padding-top: clamp(3.5rem, 7vw, 6rem); padding-bottom: clamp(3.5rem, 7vw, 6rem); }
+
+
+#arcade, #leaderboard, #launch, #waitlist {
+  scroll-margin-top: 4rem; /* matches navbar h-16 */
+}
