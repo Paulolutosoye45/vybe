@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   }
   const { playerId, distanceM, stamps } = parsed.data;
 
-  const player = db.select().from(players).where(eq(players.id, playerId)).get();
+  const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
   if (!player) {
     return NextResponse.json({ error: "Unknown player" }, { status: 404 });
   }
@@ -48,30 +48,30 @@ export async function POST(req: NextRequest) {
     stamps * POINTS.RUN_UP_STAMP +
     (reachedGate ? POINTS.RUN_UP_GLIMPSE_BONUS : 0);
 
-  db.insert(gameSessions)
+  await db.insert(gameSessions)
     .values({ id: nanoid(), playerId, game: "run-up", distanceM, stamps, reachedGate, pointsEarned })
-    .run();
+    ;
 
-  let global = db.select().from(globalAggregate).where(eq(globalAggregate.id, "singleton")).get();
+  let [global] = await db.select().from(globalAggregate).where(eq(globalAggregate.id, "singleton")).limit(1);
   if (!global) {
-    db.insert(globalAggregate)
+    await db.insert(globalAggregate)
       .values({ id: "singleton", totalSignups: 0, totalDistanceRunM: distanceM, totalRuns: 1, totalSpins: 0 })
-      .run();
+      ;
   } else {
-    db.update(globalAggregate)
+    await db.update(globalAggregate)
       .set({ totalDistanceRunM: global.totalDistanceRunM + distanceM, totalRuns: global.totalRuns + 1 })
       .where(eq(globalAggregate.id, "singleton"))
-      .run();
+      ;
   }
 
-  const stateRow = db.select().from(stateAggregate).where(eq(stateAggregate.state, player.state)).get();
+  const [stateRow] = await db.select().from(stateAggregate).where(eq(stateAggregate.state, player.state)).limit(1);
   if (!stateRow) {
-    db.insert(stateAggregate).values({ state: player.state, totalDistanceM: distanceM, totalRuns: 1 }).run();
+    await db.insert(stateAggregate).values({ state: player.state, totalDistanceM: distanceM, totalRuns: 1 });
   } else {
-    db.update(stateAggregate)
+    await db.update(stateAggregate)
       .set({ totalDistanceM: stateRow.totalDistanceM + distanceM, totalRuns: stateRow.totalRuns + 1 })
       .where(eq(stateAggregate.state, player.state))
-      .run();
+      ;
   }
 
   awardPoints(playerId, "run_up", pointsEarned, { distanceM, stamps, reachedGate });

@@ -43,10 +43,14 @@ export async function POST(req: NextRequest) {
   }
   const { playerId } = parsed.data;
 
-  const player = db.select().from(players).where(eq(players.id, playerId)).get();
+  const [player] = await db
+    .select()
+    .from(players)
+    .where(eq(players.id, playerId))
+    .limit(1);
   if (!player) return NextResponse.json({ error: "Unknown player" }, { status: 404 });
 
-  const balance = getBalance(playerId);
+  const balance = await getBalance(playerId);
   if (balance < POINTS.WHEEL_SPIN_COST) {
     return NextResponse.json(
       { error: "Not enough points to spin.", balance, cost: POINTS.WHEEL_SPIN_COST },
@@ -56,20 +60,24 @@ export async function POST(req: NextRequest) {
 
   const segment = pickSegment();
 
-  db.insert(wheelSpins)
+  await db.insert(wheelSpins)
     .values({ id: nanoid(), playerId, segmentLabel: segment.label, pointsWon: segment.value })
-    .run();
+    ;
 
-  const global = db.select().from(globalAggregate).where(eq(globalAggregate.id, "singleton")).get();
+  const [global] = await db
+    .select()
+    .from(globalAggregate)
+    .where(eq(globalAggregate.id, "singleton"))
+    .limit(1);
   if (!global) {
-    db.insert(globalAggregate)
+    await db.insert(globalAggregate)
       .values({ id: "singleton", totalSignups: 0, totalDistanceRunM: 0, totalRuns: 0, totalSpins: 1 })
-      .run();
+      ;
   } else {
-    db.update(globalAggregate)
+    await db.update(globalAggregate)
       .set({ totalSpins: global.totalSpins + 1 })
       .where(eq(globalAggregate.id, "singleton"))
-      .run();
+      ;
   }
 
   awardPoints(playerId, "wheel_spin", -POINTS.WHEEL_SPIN_COST, { segment: segment.label });
@@ -77,7 +85,7 @@ export async function POST(req: NextRequest) {
     awardPoints(playerId, "wheel_spin", segment.value, { segment: segment.label });
   }
 
-  const newBalance = getBalance(playerId);
+  const newBalance = await getBalance(playerId);
   const segmentIndex = SEGMENTS.findIndex((s) => s.label === segment.label);
 
   return NextResponse.json({

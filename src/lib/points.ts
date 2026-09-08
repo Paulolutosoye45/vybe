@@ -40,16 +40,16 @@ export function awardPoints(
       amount,
       meta: meta ? JSON.stringify(meta) : null,
     })
-    .run();
+    .execute();
 }
 
-export function getBalance(playerId: string): number {
-  const result = db
-    .select({ total: sql<number>`COALESCE(SUM(${pointsLedger.amount}), 0)` })
+export async function getBalance(playerId: string): Promise<number> {
+  const result = await db
+    .select({ total: sql<number>`COALESCE(SUM(${pointsLedger.amount}), 0)`.as("total") })
     .from(pointsLedger)
     .where(eq(pointsLedger.playerId, playerId))
-    .get();
-  return result?.total ?? 0;
+    .execute();
+  return result[0]?.total ?? 0;
 }
 
 export function getLedger(playerId: string, take = 20) {
@@ -59,5 +59,5 @@ export function getLedger(playerId: string, take = 20) {
     .where(eq(pointsLedger.playerId, playerId))
     .orderBy(desc(pointsLedger.createdAt))
     .limit(take)
-    .all();
+    .execute();
 }

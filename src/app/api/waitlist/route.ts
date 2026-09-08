@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
   const data = parsed.data;
 
-  const existing = db.select().from(players).where(eq(players.email, data.email)).get();
+  const existing = (await db.select().from(players).where(eq(players.email, data.email)))[0];
   if (existing) {
     return NextResponse.json(
       { error: "This email is already on the list.", field: "email" },
@@ -47,21 +47,23 @@ export async function POST(req: NextRequest) {
   let referredByCodeRecord = null;
   if (data.referredByCode) {
     referredByCodeRecord =
-      db.select().from(referralCodes).where(eq(referralCodes.code, data.referredByCode)).get() ??
+      (await db.select().from(referralCodes).where(eq(referralCodes.code, data.referredByCode)))[0] ??
       null;
   }
 
   // Upsert-by-hand: SQLite here holds a single aggregate row keyed "singleton".
-  let global = db.select().from(globalAggregate).where(eq(globalAggregate.id, "singleton")).get();
+  let global = (await db
+    .select()
+    .from(globalAggregate)
+    .where(eq(globalAggregate.id, "singleton")))[0];
   if (!global) {
     global = { id: "singleton", totalSignups: 1, totalDistanceRunM: 0, totalRuns: 0, totalSpins: 0 };
-    db.insert(globalAggregate).values(global).run();
+    await db.insert(globalAggregate).values(global);
   } else {
     global = { ...global, totalSignups: global.totalSignups + 1 };
-    db.update(globalAggregate)
+    await db.update(globalAggregate)
       .set({ totalSignups: global.totalSignups })
-      .where(eq(globalAggregate.id, "singleton"))
-      .run();
+      .where(eq(globalAggregate.id, "singleton"));
   }
   const queuePosition = global.totalSignups;
 
@@ -70,8 +72,8 @@ export async function POST(req: NextRequest) {
   const playerId = nanoid();
   const today = new Date().toISOString().slice(0, 10);
 
-  db.insert(referralCodes).values({ id: myCodeId, code: myCode }).run();
-  db.insert(players)
+  await db.insert(referralCodes).values({ id: myCodeId, code: myCode });
+  await db.insert(players)
     .values({
       id: playerId,
       firstName: data.firstName,
@@ -85,33 +87,31 @@ export async function POST(req: NextRequest) {
       streak: 1,
       referralCodeId: myCodeId,
       referredByCodeId: referredByCodeRecord?.id ?? null,
-    })
-    .run();
+    });
 
   awardPoints(playerId, "signup_bonus", POINTS.SIGNUP_BONUS);
 
   // Reward the referrer: one event per successful referral, fully auditable.
   if (referredByCodeRecord) {
-    db.insert(referralEvents)
+    await db.insert(referralEvents)
       .values({
         id: nanoid(),
         referralCodeId: referredByCodeRecord.id,
         newPlayerId: playerId,
         spotsAwarded: 10,
-      })
-      .run();
+      });
 
-    const referrer = db
-      .select()
-      .from(players)
-      .where(eq(players.referralCodeId, referredByCodeRecord.id))
-      .get();
+    const referrer = (
+      await db
+        .select()
+        .from(players)
+        .where(eq(players.referralCodeId, referredByCodeRecord.id))
+    )[0];
     if (referrer) {
       const newPosition = Math.max(1, referrer.queuePosition - 10);
-      db.update(players)
+      await db.update(players)
         .set({ queuePosition: newPosition })
-        .where(eq(players.id, referrer.id))
-        .run();
+        .where(eq(players.id, referrer.id));
       awardPoints(referrer.id, "referral_bonus", POINTS.REFERRAL_BONUS, { newPlayerId: playerId });
     }
   }

@@ -8,16 +8,19 @@ export async function GET(req: NextRequest) {
   const playerId = req.nextUrl.searchParams.get("playerId");
   if (!playerId) return NextResponse.json({ error: "playerId is required" }, { status: 400 });
 
-  const player = db.select().from(players).where(eq(players.id, playerId)).get();
+  const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
   if (!player) return NextResponse.json({ error: "Unknown player" }, { status: 404 });
 
-  const myCode = db
+  const [myCode] = await db
     .select()
     .from(referralCodes)
     .where(eq(referralCodes.id, player.referralCodeId))
-    .get();
+    .limit(1);
   const referralCount = myCode
-    ? db.select().from(referralEvents).where(eq(referralEvents.referralCodeId, myCode.id)).all().length
+    ? (await db
+        .select()
+        .from(referralEvents)
+        .where(eq(referralEvents.referralCodeId, myCode.id))).length
     : 0;
 
   // Streak update happens on read — the first visit of a new calendar day
@@ -29,7 +32,7 @@ export async function GET(req: NextRequest) {
       (new Date(today).getTime() - new Date(player.lastVisitDate).getTime()) / 86400000
     );
     streak = diffDays === 1 ? streak + 1 : 1;
-    db.update(players).set({ streak, lastVisitDate: today }).where(eq(players.id, playerId)).run();
+    await db.update(players).set({ streak, lastVisitDate: today }).where(eq(players.id, playerId));
     if (streak >= 2) {
       awardPoints(playerId, "daily_streak", POINTS.DAILY_STREAK_BONUS, { streak });
     }
