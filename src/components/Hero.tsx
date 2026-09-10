@@ -55,7 +55,7 @@ export default function Hero({
 
           <p className="text-inkdim text-lg sm:text-xl text-center mx-auto leading-relaxed max-w-3xl mb-10 font-light">
             On <span className="font-bold text-ink">1 October 2026</span>, First Bank throws open Nigeria&rsquo;s biggest December yet. Run the
-            gate, spin for points, and bring someone with s you —{" "}
+            gate, spin for points, and bring someone with you —{" "}
             <span className="text-ink font-medium">every friend who joins moves you closer to the front.</span>
           </p>
 
