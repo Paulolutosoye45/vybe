@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Share2, Zap } from "lucide-react";
 import RunUpGame, { RunUpResult } from "./games/RunUpGame";
 import VybeWheel from "./games/VybeWheel";
+import PlayerLeaderboard from "./PlayerLeaderboard";
 import { PlayerProfile } from "@/lib/usePlayer";
 import { LEVELS } from "@/lib/levels";
+import { shareRunCard } from "@/lib/shareCard";
 
 type Tab = "run-up" | "wheel";
+
+interface DailyChallengeResult { label: string; satisfiedToday: boolean; newlyCompleted: boolean; }
 
 export default function GameArcade({
   playerId,
@@ -24,6 +29,8 @@ export default function GameArcade({
 }) {
   const [tab, setTab] = useState<Tab>("run-up");
   const [lastRun, setLastRun] = useState<(RunUpResult & { pointsEarned?: number; starBonusPoints?: number }) | null>(null);
+  const [dailyChallenge, setDailyChallenge] = useState<DailyChallengeResult | null>(null);
+  const [shareState, setShareState] = useState<"idle" | "sharing" | "done">("idle");
 
   async function handleGameOver(result: RunUpResult) {
     if (!playerId) {
@@ -45,6 +52,7 @@ export default function GameArcade({
       });
       const data = await res.json();
       setLastRun({ ...result, pointsEarned: data.pointsEarned, starBonusPoints: data.starBonusPoints });
+      if (data.dailyChallenge) setDailyChallenge(data.dailyChallenge);
       onProfileRefresh();
     } catch {
       setLastRun(result);
@@ -55,6 +63,21 @@ export default function GameArcade({
     ? LEVELS.find((l) => l.level === lastRun.levelResults[lastRun.levelResults.length - 1].level)
     : null;
   const totalStars = lastRun?.levelResults.reduce((s, r) => s + r.stars, 0) ?? 0;
+
+  async function handleShare() {
+    if (!lastRun) return;
+    setShareState("sharing");
+    await shareRunCard(
+      {
+        distanceM: lastRun.distanceM,
+        totalStars,
+        furthestLevel: furthestLevel?.level ?? 1,
+        pointsEarned: lastRun.pointsEarned,
+      },
+      () => setShareState("done")
+    );
+    setTimeout(() => setShareState("idle"), 2200);
+  }
 
   return (
     <section id="arcade" className="section-pad">
@@ -84,6 +107,21 @@ export default function GameArcade({
           </p>
         </div>
 
+        {tab === "run-up" && (
+          <div className="glass rounded-xl px-4 sm:px-5 py-3 flex items-center gap-3 mb-5">
+            <Zap size={15} className="text-brand-orange shrink-0" />
+            <span className="text-sm">
+              <span className="text-inkdim">Today&rsquo;s Vybe Challenge:</span>{" "}
+              <span className="font-medium">{dailyChallenge?.label ?? "play a run to see it"}</span>
+            </span>
+            {dailyChallenge?.satisfiedToday && (
+              <span className="ml-auto text-xs font-semibold text-brand-green shrink-0">
+                {dailyChallenge.newlyCompleted ? "+40 just now \u2713" : "Done today \u2713"}
+              </span>
+            )}
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
           {tab === "run-up" ? (
             <motion.div key="run-up" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}>
@@ -95,27 +133,37 @@ export default function GameArcade({
                 />
               </div>
               {lastRun && (
-                <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3.5">
-                  <Stat label="This run" value={`${lastRun.distanceM}m`} />
-                  <Stat label="Reached" value={furthestLevel ? furthestLevel.name : "\u2014"} />
-                  <Stat label="Stars earned" value={`${totalStars} \u2605`} highlight={totalStars > 0} />
-                  {playerId ? (
-                    <Stat
-                      label="Points earned"
-                      value={`+${lastRun.pointsEarned ?? 0}`}
-                      sublabel={lastRun.starBonusPoints ? `incl. +${lastRun.starBonusPoints} for new stars` : undefined}
-                      highlight
-                    />
-                  ) : (
-                    <button
-                      onClick={onNeedSignup}
-                      className="glass rounded-xl px-4 py-3 text-left border-dashed border-brand-cyan/40 hover:border-brand-cyan/70 transition-colors"
-                    >
-                      <div className="text-xs text-inkdim">Join to save this</div>
-                      <div className="font-semibold text-brand-cyan text-sm mt-0.5">Claim your points \u2192</div>
-                    </button>
-                  )}
-                </div>
+                <>
+                  <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3.5">
+                    <Stat label="This run" value={`${lastRun.distanceM}m`} />
+                    <Stat label="Reached" value={furthestLevel ? furthestLevel.name : "\u2014"} />
+                    <Stat label="Stars earned" value={`${totalStars} \u2605`} highlight={totalStars > 0} />
+                    {playerId ? (
+                      <Stat
+                        label="Points earned"
+                        value={`+${lastRun.pointsEarned ?? 0}`}
+                        sublabel={lastRun.starBonusPoints ? `incl. +${lastRun.starBonusPoints} for new stars` : undefined}
+                        highlight
+                      />
+                    ) : (
+                      <button
+                        onClick={onNeedSignup}
+                        className="glass rounded-xl px-4 py-3 text-left border-dashed border-brand-cyan/40 hover:border-brand-cyan/70 transition-colors"
+                      >
+                        <div className="text-xs text-inkdim">Join to save this</div>
+                        <div className="font-semibold text-brand-cyan text-sm mt-0.5">Claim your points \u2192</div>
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleShare}
+                    disabled={shareState === "sharing"}
+                    className="mt-4 flex items-center gap-2 glass rounded-lg px-4 py-2.5 text-sm font-semibold hover:border-brand-cyan/50 transition-colors disabled:opacity-60"
+                  >
+                    <Share2 size={14} />
+                    {shareState === "done" ? "Shared!" : shareState === "sharing" ? "Preparing\u2026" : "Share your run"}
+                  </button>
+                </>
               )}
             </motion.div>
           ) : (
@@ -135,6 +183,12 @@ export default function GameArcade({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {tab === "run-up" && (
+          <div className="mt-6">
+            <PlayerLeaderboard playerId={playerId} />
+          </div>
+        )}
       </div>
     </section>
   );
