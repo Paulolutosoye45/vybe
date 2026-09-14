@@ -1,12 +1,14 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import Hero from "@/components/Hero";
 import GameArcade from "@/components/GameArcade";
 import RewardsPanel from "@/components/RewardsPanel";
-import Leaderboard from "@/components/Leaderboard";
+import PlayerLeaderboard from "@/components/PlayerLeaderboard";
+import DailyStreakCard from "@/components/DailyStreakCard";
+import BluuTVGallery from "@/components/BluuTVGallery";
 import WaitlistForm from "@/components/WaitlistForm";
 import ReferralCard from "@/components/ReferralCard";
 import Footer from "@/components/Footer";
@@ -20,6 +22,8 @@ const OPENS = [
   { n: "03", title: "Every door in the city", body: "The way you bank starts opening doors you couldn't get through before." },
   { n: "04", title: "Your December, wrapped", body: "At the end of it all, a recap that's entirely yours — worth keeping, worth sharing." },
 ];
+
+
 
 
 
@@ -179,6 +183,7 @@ function Navbar({
   );
 }
 
+
 function HomeContent() {
   const searchParams = useSearchParams();
   const referredByCode = searchParams.get("ref");
@@ -186,12 +191,8 @@ function HomeContent() {
   const [justJoined, setJustJoined] = useState<{ queuePosition: number; referralCode: string } | null>(null);
   const gate = gateDistanceToday();
 
-  function scrollToArcade() {
-    document.getElementById("arcade")?.scrollIntoView();
-  }
-  function scrollToWaitlist() {
-    document.getElementById("waitlist")?.scrollIntoView();
-  }
+  function scrollToArcade() { document.getElementById("arcade")?.scrollIntoView(); }
+  function scrollToWaitlist() { document.getElementById("waitlist")?.scrollIntoView(); }
 
   function handleSignupSuccess(id: string, queuePosition: number, referralCode: string) {
     setPlayerId(id);
@@ -202,46 +203,67 @@ function HomeContent() {
   return (
     <main id="top">
       <Navbar playerId={playerId} onJoinClick={scrollToWaitlist} />
+      <Hero onPlayClick={scrollToArcade} onJoinClick={scrollToWaitlist} />
 
-      {/* Offset for the fixed navbar */}
-      <div className="pt-16">
-        <Hero onPlayClick={scrollToArcade} onJoinClick={scrollToWaitlist} />
-
-        <section id="arcade">
-          <GameArcade
-            playerId={playerId}
-            profile={profile}
-            gateDistanceToday={gate}
-            onNeedSignup={scrollToWaitlist}
-            onProfileRefresh={() => playerId && refresh(playerId)}
-          />
+      {profile && (
+        <section className="max-w-5xl mx-auto px-6 sm:px-8 pt-10">
+          <DailyStreakCard streak={profile.streak} playedToday={profile.playedToday} streakFreezes={profile.streakFreezes} onPlayClick={scrollToArcade} />
         </section>
+      )}
 
-        {profile && (
-          <section className="max-w-5xl mx-auto px-6 sm:px-8 pb-4">
-            <RewardsPanel profile={profile} />
-          </section>
-        )}
+      <GameArcade
+        playerId={playerId}
+        profile={profile}
+        gateDistanceToday={gate}
+        onNeedSignup={scrollToWaitlist}
+        onProfileRefresh={() => playerId && refresh(playerId)}
+      />
 
-        <section id="leaderboard">
-          <Leaderboard />
+      {profile && (
+        <section className="max-w-5xl mx-auto px-6 sm:px-8 pb-4">
+          <RewardsPanel profile={profile} />
         </section>
+      )}
 
-        <section id="waitlist" className="section-pad border-t border-white/[0.06]">
-          <div className="max-w-3xl  mx-auto px-6 sm:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <div className="text-center">
-                <span className="text-xs mx-auto text-center font-semibold tracking-[0.16em] text-brand-cyan uppercase">
-                  No cost. No catch.
-                </span>
-              </div>
+      <section id="leaderboard" className="section-pad border-t border-white/[0.06]">
+        <div className="max-w-5xl mx-auto px-6 sm:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <span className="text-xs font-semibold tracking-[0.16em] text-brand-cyan uppercase">Player vs. player</span>
+            <h2 className="font-serif text-4xl sm:text-5xl font-semibold mb-8 mt-2 max-w-lg tracking-tight">
+              Who&rsquo;s actually winning
+            </h2>
+            <PlayerLeaderboard playerId={playerId} />
+          </motion.div>
+        </div>
+      </section>
 
-              <h2 className="font-serif text-center mx-auto text-3xl sm:text-4xl md:text-5xl font-semibold mb-4 mt-2 max-w-lg tracking-tight">
+      <BluuTVGallery
+        playerId={playerId}
+        watchedVideoIds={profile?.watchedVideoIds ?? []}
+        seriesCompleted={profile?.bluutvSeriesCompleted ?? false}
+        onNeedSignup={scrollToWaitlist}
+        onWatched={() => playerId && refresh(playerId)}
+      />
+
+      <section id="waitlist" className="section-pad border-t border-white/[0.06]">
+        <div className="max-w-3xl mx-auto px-6 sm:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="text-center">
+              <span className="text-xs mx-auto text-center font-semibold tracking-[0.16em] text-brand-cyan uppercase">
+                No cost. No catch.
+              </span>
+            </div>
+            <h2 className="font-serif text-center mx-auto text-3xl sm:text-4xl md:text-5xl font-semibold mb-4 mt-2 max-w-lg tracking-tight">
                 Claim your place before the door opens
               </h2>
               <p className="text-inkdim max-w-lg text-center mx-auto mb-10 text-[15px] leading-relaxed">
@@ -249,49 +271,50 @@ function HomeContent() {
                 join — bring a friend and yours moves up.
               </p>
 
-              {justJoined ? (
-                <ReferralCard queuePosition={justJoined.queuePosition} referralCode={justJoined.referralCode} />
-              ) : (
-                <WaitlistForm referredByCode={referredByCode} onSuccess={handleSignupSuccess} />
-              )}
-            </motion.div>
-          </div>
-        </section>
+            {playerId && profile ? (
+              <ReferralCard
+                queuePosition={justJoined?.queuePosition ?? profile.queuePosition}
+                referralCode={profile.referralCode}
+                referralCount={profile.referralCount}
+              />
+            ) : (
+              <WaitlistForm referredByCode={referredByCode} onSuccess={handleSignupSuccess} />
+            )}
+          </motion.div>
+        </div>
+      </section>
 
-        <section id="launch" className="section-pad border-t border-white/[0.06]">
-          <div className="max-w-5xl mx-auto px-6 sm:px-8">
-            <div className="mb-10">
-              <span className="text-xs font-semibold tracking-[0.16em] text-brand-cyan uppercase">
-                The 1 October launch
-              </span>
-              <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-semibold mt-2 max-w-lg tracking-tight">
-                What opens on 1 October
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {OPENS.map((o, i) => (
-                <motion.div
-                  key={o.n}
-                  initial={{ opacity: 0, y: 18 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-60px" }}
-                  transition={{ duration: 0.5, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
-                  whileHover={{ y: -4 }}
-                  className="glass rounded-2xl p-6 min-h-[180px] sm:min-h-[210px] flex flex-col justify-between hover:border-brand-cyan/30 transition-colors"
-                >
-                  <span className="font-serif text-sm font-semibold grad-text">{o.n}</span>
-                  <div>
-                    <h3 className="font-serif text-lg font-semibold mt-4 mb-2">{o.title}</h3>
-                    <p className="text-sm text-inkdim leading-relaxed">{o.body}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+      <section className="section-pad border-t border-white/[0.06]">
+        <div className="max-w-5xl mx-auto px-6 sm:px-8">
+          <div className="mb-10">
+            <span className="text-xs font-semibold tracking-[0.16em] text-brand-cyan uppercase">The 1 October launch</span>
+            <h2 className="font-serif text-4xl sm:text-5xl font-semibold mt-2 max-w-lg tracking-tight">
+              What opens on 1 October
+            </h2>
           </div>
-        </section>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {OPENS.map((o, i) => (
+              <motion.div
+                key={o.n}
+                initial={{ opacity: 0, y: 18 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.5, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                whileHover={{ y: -4 }}
+                className="glass rounded-2xl p-6 min-h-[210px] flex flex-col justify-between hover:border-brand-cyan/30 transition-colors"
+              >
+                <span className="font-serif text-sm font-semibold grad-text">{o.n}</span>
+                <div>
+                  <h3 className="font-serif text-lg font-semibold mt-4 mb-2">{o.title}</h3>
+                  <p className="text-sm text-inkdim leading-relaxed">{o.body}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-        <Footer />
-      </div>
+      <Footer />
     </main>
   );
 }

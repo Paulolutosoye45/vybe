@@ -8,6 +8,11 @@ import { generateReferralCode } from "@/lib/gate";
 import { awardPoints, POINTS } from "@/lib/points";
 
 const WaitlistSchema = z.object({
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .max(20, "Username must be 20 characters or fewer")
+    .regex(/^[a-zA-Z0-9_]+$/, "Letters, numbers and underscores only"),
   firstName: z.string().min(1, "First name is required").max(80),
   lastName: z.string().min(1, "Last name is required").max(80),
   email: z.string().email("Enter a valid email address"),
@@ -35,10 +40,18 @@ export async function POST(req: NextRequest) {
   }
   const data = parsed.data;
 
-  const existing = (await db.select().from(players).where(eq(players.email, data.email)))[0];
+  const existing = db.select().from(players).where(eq(players.email, data.email)).get();
   if (existing) {
     return NextResponse.json(
       { error: "This email is already on the list.", field: "email" },
+      { status: 409 }
+    );
+  }
+
+  const usernameTaken = db.select().from(players).where(eq(players.username, data.username)).get();
+  if (usernameTaken) {
+    return NextResponse.json(
+      { error: "That username is already taken.", field: "username" },
       { status: 409 }
     );
   }
@@ -47,23 +60,21 @@ export async function POST(req: NextRequest) {
   let referredByCodeRecord = null;
   if (data.referredByCode) {
     referredByCodeRecord =
-      (await db.select().from(referralCodes).where(eq(referralCodes.code, data.referredByCode)))[0] ??
+      db.select().from(referralCodes).where(eq(referralCodes.code, data.referredByCode)).get() ??
       null;
   }
 
   // Upsert-by-hand: SQLite here holds a single aggregate row keyed "singleton".
-  let global = (await db
-    .select()
-    .from(globalAggregate)
-    .where(eq(globalAggregate.id, "singleton")))[0];
+  let global = db.select().from(globalAggregate).where(eq(globalAggregate.id, "singleton")).get();
   if (!global) {
     global = { id: "singleton", totalSignups: 1, totalDistanceRunM: 0, totalRuns: 0, totalSpins: 0 };
-    await db.insert(globalAggregate).values(global);
+    db.insert(globalAggregate).values(global).run();
   } else {
     global = { ...global, totalSignups: global.totalSignups + 1 };
-    await db.update(globalAggregate)
+    db.update(globalAggregate)
       .set({ totalSignups: global.totalSignups })
-      .where(eq(globalAggregate.id, "singleton"));
+      .where(eq(globalAggregate.id, "singleton"))
+      .run();
   }
   const queuePosition = global.totalSignups;
 
@@ -72,10 +83,11 @@ export async function POST(req: NextRequest) {
   const playerId = nanoid();
   const today = new Date().toISOString().slice(0, 10);
 
-  await db.insert(referralCodes).values({ id: myCodeId, code: myCode });
-  await db.insert(players)
+  db.insert(referralCodes).values({ id: myCodeId, code: myCode }).run();
+  db.insert(players)
     .values({
       id: playerId,
+      username: data.username,
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email,
@@ -84,37 +96,58 @@ export async function POST(req: NextRequest) {
       consentMarketing: data.consentMarketing,
       queuePosition,
       lastVisitDate: today,
-      streak: 1,
+      // streak intentionally omitted — defaults to 0. It only becomes 1 the
+      // first time this player actually plays something (see recordDailyPlay
+      // in points.ts), not just for signing up.
       referralCodeId: myCodeId,
       referredByCodeId: referredByCodeRecord?.id ?? null,
-    });
+    })
+    .run();
 
   awardPoints(playerId, "signup_bonus", POINTS.SIGNUP_BONUS);
 
   // Reward the referrer: one event per successful referral, fully auditable.
   if (referredByCodeRecord) {
-    await db.insert(referralEvents)
+    db.insert(referralEvents)
       .values({
         id: nanoid(),
         referralCodeId: referredByCodeRecord.id,
         newPlayerId: playerId,
         spotsAwarded: 10,
-      });
+      })
+      .run();
 
-    const referrer = (
-      await db
-        .select()
-        .from(players)
-        .where(eq(players.referralCodeId, referredByCodeRecord.id))
-    )[0];
+    const referrer = db
+      .select()
+      .from(players)
+      .where(eq(players.referralCodeId, referredByCodeRecord.id))
+      .get();
     if (referrer) {
       const newPosition = Math.max(1, referrer.queuePosition - 10);
-      await db.update(players)
+      db.update(players)
         .set({ queuePosition: newPosition })
-        .where(eq(players.id, referrer.id));
+        .where(eq(players.id, referrer.id))
+        .run();
       awardPoints(referrer.id, "referral_bonus", POINTS.REFERRAL_BONUS, { newPlayerId: playerId });
+
+      // Referral tiers — a one-time bonus the moment the referrer's count
+      // first reaches 3, 5, or 10. referralTier tracks the highest tier
+      // already paid, so this fires exactly once per threshold even if
+      // referrals keep coming in afterward.
+      const totalReferrals = db
+        .select()
+        .from(referralEvents)
+        .where(eq(referralEvents.referralCodeId, referredByCodeRecord.id))
+        .all().length;
+      const tierThresholds = Object.keys(POINTS.REFERRAL_TIER_BONUS).map(Number).sort((a, b) => a - b);
+      for (const tier of tierThresholds) {
+        if (totalReferrals === tier && referrer.referralTier < tier) {
+          awardPoints(referrer.id, "referral_tier_bonus", POINTS.REFERRAL_TIER_BONUS[tier], { tier });
+          db.update(players).set({ referralTier: tier }).where(eq(players.id, referrer.id)).run();
+        }
+      }
     }
   }
 
-  return NextResponse.json({ playerId, queuePosition, referralCode: myCode });
+  return NextResponse.json({ playerId, username: data.username, queuePosition, referralCode: myCode });
 }

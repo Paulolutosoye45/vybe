@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "acd055be-17f5-48c7-b659-01742e271eba",
-  "prevId": "4fd23454-7a73-4b1e-b1a8-be4679616f83",
+  "id": "1bc0d177-6821-4c41-af88-6913274a7c70",
+  "prevId": "acd055be-17f5-48c7-b659-01742e271eba",
   "tables": {
     "game_sessions": {
       "name": "game_sessions",
@@ -285,6 +285,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "daily_challenge_date": {
+          "name": "daily_challenge_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "referral_code_id": {

@@ -159,8 +159,3 @@ body {
 
 /* section rhythm — used instead of ad hoc py-16 scattered through components */
 .section-pad { padding-top: clamp(3.5rem, 7vw, 6rem); padding-bottom: clamp(3.5rem, 7vw, 6rem); }
-
-
-#arcade, #leaderboard, #launch, #waitlist {
-  scroll-margin-top: 4rem; /* matches navbar h-16 */
-}

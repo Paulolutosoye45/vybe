@@ -1,0 +1,1 @@
+ALTER TABLE `players` ADD `daily_challenge_date` text;

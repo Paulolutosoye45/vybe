@@ -40,7 +40,16 @@ export default function Hero({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         >
-          
+          {/* <div className="flex items-center gap-3 mb-10">
+            <Image
+              src="/diav-logo.webp"
+              alt="December Issa Vybe, powered in part by FirstBank"
+              width={118}
+              height={104}
+              priority
+              className="drop-shadow-[0_8px_30px_rgba(47,184,224,0.25)]"
+            />
+          </div> */}
 
           {/* <div className="inline-flex items-center gap-2.5 text-xs font-semibold tracking-[0.16em] text-brand-cyan border border-brand-cyan/30 bg-brand-cyan/[0.06] backdrop-blur-sm rounded-full px-4 py-2 mb-8">
             <span className="w-1.5 h-1.5 rounded-full bg-brand-cyan shadow-[0_0_10px_#2FB8E0] animate-pulse" />
@@ -53,18 +62,18 @@ export default function Hero({
             For now.
           </h1>
 
-          <p className="text-inkdim text-lg sm:text-xl text-center mx-auto leading-relaxed max-w-3xl mb-10 font-light">
+         <p className="text-inkdim text-lg sm:text-xl text-center mx-auto leading-relaxed max-w-3xl mb-10 font-light">
             On <span className="font-bold text-ink">1 October 2026</span>, First Bank throws open Nigeria&rsquo;s biggest December yet. Run the
             gate, spin for points, and bring someone with you —{" "}
             <span className="text-ink font-medium">every friend who joins moves you closer to the front.</span>
           </p>
 
-          <div className="flex flex-wrap justify-center items-center gap-4 mb-12">
+          <div className="flex flex-wrap  justify-center items-center gap-4 mb-12">
             <motion.button
-              whileHover={{ y: -3, boxShadow: "0 20px 50px -12px rgba(47,184,224,0.55)" }}
+              whileHover={{ y: -3, boxShadow: "0 20px 50px -12px rgba(224,173,15,0.5)" }}
               whileTap={{ scale: 0.97 }}
               onClick={onPlayClick}
-              className="bg-brand-gradient text-white font-semibold px-8 py-4 rounded-xl shadow-[0_12px_36px_-10px_rgba(60,100,200,0.65)] flex items-center gap-2.5 text-[15px]"
+              className="bg-brand-gradient text-night font-semibold px-8 py-4 rounded-xl shadow-[0_12px_36px_-10px_rgba(224,173,15,0.45)] flex items-center gap-2.5 text-[15px]"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8 5v14l11-7z" />

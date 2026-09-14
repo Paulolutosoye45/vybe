@@ -120,7 +120,7 @@ export default function VybeWheel({
       <button
         onClick={spin}
         disabled={spinning}
-        className="bg-brand-gradient text-white font-semibold px-8 py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_10px_30px_-10px_rgba(60,100,200,0.6)]"
+        className="bg-brand-gradient text-night font-semibold px-8 py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_10px_30px_-10px_rgba(224,173,15,0.45)]"
       >
         {spinning ? "Spinning…" : `Spin for ${spinCost} points`}
       </button>

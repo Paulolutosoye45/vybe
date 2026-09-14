@@ -1,21 +1,15 @@
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 
-const globalForDb = globalThis as unknown as { conn?: postgres.Sql };
+// Same hot-reload-safe singleton pattern this project used for Prisma —
+// avoids opening a new SQLite file handle on every dev save.
+const globalForDb = globalThis as unknown as { sqlite?: Database.Database };
 
-function getConnectionString() {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      "DATABASE_URL is not set. Add a Postgres connection string to your .env file."
-    );
-  }
-  return url;
-}
+const sqlite =
+  globalForDb.sqlite ?? new Database(process.env.DATABASE_URL || "./dev.db");
+sqlite.pragma("journal_mode = WAL");
 
-const conn = globalForDb.conn ?? postgres(getConnectionString());
+if (process.env.NODE_ENV !== "production") globalForDb.sqlite = sqlite;
 
-if (process.env.NODE_ENV !== "production") globalForDb.conn = conn;
-
-export const db = drizzle(conn, { schema });
+export const db = drizzle(sqlite, { schema });

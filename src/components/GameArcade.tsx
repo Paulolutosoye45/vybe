@@ -5,12 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Share2, Zap } from "lucide-react";
 import RunUpGame, { RunUpResult } from "./games/RunUpGame";
 import VybeWheel from "./games/VybeWheel";
-import PlayerLeaderboard from "./PlayerLeaderboard";
+import NaijaNightSchool from "./NaijaNightSchool";
 import { PlayerProfile } from "@/lib/usePlayer";
 import { LEVELS } from "@/lib/levels";
 import { shareRunCard } from "@/lib/shareCard";
 
-type Tab = "run-up" | "wheel";
+type Tab = "run-up" | "wheel" | "trivia";
 
 interface DailyChallengeResult { label: string; satisfiedToday: boolean; newlyCompleted: boolean; }
 
@@ -83,27 +83,34 @@ export default function GameArcade({
     <section id="arcade" className="section-pad">
       <div className="max-w-5xl mx-auto px-6 sm:px-8">
         <div className="mb-10">
-          <span className="text-xs font-semibold tracking-[0.16em] text-brand-cyan uppercase">Two games, one currency</span>
+          <span className="text-xs font-semibold tracking-[0.16em] text-brand-cyan uppercase">Three games, one currency</span>
           <div className="flex items-end justify-between flex-wrap gap-5 mt-2">
             <h2 className="font-serif text-4xl sm:text-5xl font-semibold tracking-tight">The Vybe Arcade</h2>
-            <div className="flex gap-1 glass rounded-xl p-1.5">
+            <div className="flex gap-1 glass rounded-xl p-1.5 flex-wrap">
               <button
                 onClick={() => setTab("run-up")}
-                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${tab === "run-up" ? "bg-brand-gradient text-white shadow-lg" : "text-inkdim hover:text-ink"}`}
+                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${tab === "run-up" ? "bg-brand-gradient text-night shadow-lg" : "text-inkdim hover:text-ink"}`}
               >
                 The Run Up
               </button>
               <button
                 onClick={() => setTab("wheel")}
-                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${tab === "wheel" ? "bg-brand-gradient text-white shadow-lg" : "text-inkdim hover:text-ink"}`}
+                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${tab === "wheel" ? "bg-brand-gradient text-night shadow-lg" : "text-inkdim hover:text-ink"}`}
               >
                 The Vybe Wheel
+              </button>
+              <button
+                onClick={() => setTab("trivia")}
+                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${tab === "trivia" ? "bg-brand-gradient text-night shadow-lg" : "text-inkdim hover:text-ink"}`}
+              >
+                Naija Night School
               </button>
             </div>
           </div>
           <p className="text-inkdim mt-3 max-w-xl">
-            Five stops between here and the gate — Homecoming, The Rush, Owambe Street, Detty
-            December, and the door itself. Every point you earn carries straight into December.
+            Thirty levels, six real stops between here and the gate — Departure, Homecoming, The
+            Rush, Owambe Street, Detty December, and the door itself. Every point you earn carries
+            straight into December.
           </p>
         </div>
 
@@ -123,7 +130,7 @@ export default function GameArcade({
         )}
 
         <AnimatePresence mode="wait">
-          {tab === "run-up" ? (
+          {tab === "run-up" && (
             <motion.div key="run-up" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}>
               <div className="glass-strong rounded-2xl p-2 sm:p-3">
                 <RunUpGame
@@ -166,7 +173,9 @@ export default function GameArcade({
                 </>
               )}
             </motion.div>
-          ) : (
+          )}
+
+          {tab === "wheel" && (
             <motion.div key="wheel" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }} className="glass-strong rounded-2xl py-12 px-6">
               <VybeWheel
                 playerId={playerId}
@@ -182,13 +191,17 @@ export default function GameArcade({
               )}
             </motion.div>
           )}
-        </AnimatePresence>
 
-        {tab === "run-up" && (
-          <div className="mt-6">
-            <PlayerLeaderboard playerId={playerId} />
-          </div>
-        )}
+          {tab === "trivia" && (
+            <motion.div key="trivia" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}>
+              <NaijaNightSchool
+                playerId={playerId}
+                onNeedSignup={onNeedSignup}
+                onComplete={() => onProfileRefresh()}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </section>
   );

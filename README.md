@@ -90,6 +90,58 @@ Every one of these was actually run and checked, not just written:
   the daily "gate" distance) that posts real scores to `/api/game-score`,
   which writes to the points ledger, the state leaderboard, and the national
   counter in one transaction-like sequence.
+- **Five levels, mapped to the platform's own pillars** — Homecoming, The
+  Rush, Owambe Street, Detty December, and The Gate — each with its own
+  obstacle set, colour palette, and speed curve (see `src/lib/levels.ts`,
+  the single source of truth both the client and the server read from). A
+  level-up card announces each transition; stars (0–3 per level, upserted
+  into `level_progress`) are computed from whether the player completed
+  the band and how many of that level's stamps they collected. Verified
+  end to end: all four transitions fire and correctly resume gameplay,
+  and a full run through level 3 produced the exact expected star count
+  and point total, confirmed against the database afterwards.
+- **A first-play tutorial and a persistent legend** — three-step visual
+  walkthrough (jump / slide / what glows vs what doesn't) shown once per
+  browser, replayable any time via "How to play". The first ground
+  obstacle and the first overhead obstacle each carry a one-time on-canvas
+  hint the first time they appear, on top of the tutorial rather than
+  instead of it.
+- **Obstacle spacing, fixed and verified in actual frame counts** — player
+  feedback was that obstacles felt clustered. They were: the spawn timer
+  depletes by `speed` px every frame (a pixel-budget, not a frame counter),
+  but the original refill value was sized as if it were a frame count —
+  a genuine units bug that meant real gaps silently shrank as speed rose,
+  worst case dropping to ~800ms at top speed, under a fair reaction
+  window. Fixed by expressing the refill in the timer's own units, with a
+  floor that never drops below ~1.4s even at maximum speed. This couldn't
+  be trusted by eye — this sandbox's headless Chromium renders at ~16fps,
+  not 60fps, so wall-clock screenshots were actively misleading. Verified
+  instead by reading actual frame numbers between spawns directly out of
+  the running game across several independent runs (108–127 frames,
+  squarely inside the 105–175 target) — the only measurement that's
+  correct regardless of the renderer's speed.
+- **Background marketing billboards** — decorative, non-colliding signage
+  scrolling through the skyline layer with real launch messaging ("THE
+  GATE OPENS 1 OCT", "ACCESS IS THE VYBE", "NOTHING IS BOUGHT. EVERYTHING
+  IS EARNED."), on an independent slow cadence so it can never interfere
+  with obstacle spacing. Confirmed spawning with real copy during actual
+  gameplay, not just present in the source.
+- **A real share card** — a canvas-rendered image (distance, level
+  reached, stars, points) with a genuine Web Share API integration and a
+  download fallback for browsers without it. Verified end to end: a real
+  286KB PNG was generated and downloaded with the correct filename in a
+  browser that doesn't support `navigator.share`, exactly the fallback
+  path most desktop users will actually take.
+- **A nationwide, competitive leaderboard** — ranked by total stars across
+  all five levels (0–15), not a single lucky sprint, with best distance as
+  a tiebreaker. Only first name and state are ever shown, the same privacy
+  boundary the state leaderboard already used. Verified with three real
+  signed-up players producing a correctly ranked result from a live
+  aggregate query.
+- **The Daily Vybe Challenge** — one challenge a day, the same for
+  everyone, rotating deterministically by date (`src/lib/dailyChallenge.ts`)
+  so it needs no scheduler. Checked from the data a single run already
+  produces, awarded at most once per calendar day per player.
 - **The Vybe Wheel** — a second game, and the actual reward mechanic you
   asked for. The server picks the outcome — the client never decides its own
   prize — and the result is deducted/paid into the same points ledger.
@@ -104,8 +156,6 @@ Every one of these was actually run and checked, not just written:
   points?" — you can show every line, not just trust a number).
 - **The state leaderboard and national counter** — real aggregated data,
   polled every 15 seconds.
-
----
 
 ## What isn't verified
 
@@ -181,10 +231,14 @@ This is a driver swap, not a redesign.
 
 Game scores are currently client-reported with a generous server-side
 sanity ceiling (max 500m per run) — not a server-authoritative physics
-replay. This is a fine trade-off for a teaser where points are cosmetic,
-but if this evolves into the real Play pillar with meaningful rewards, see
-the Teaser Blueprint Part 5.11 for what a full anti-cheat pass needs
-(signed run tokens, server-side replay validation, rate limiting).
+replay. Stars and the combo-multiplied stamp points carry the same trust
+boundary: computed client-side, sanity-checked server-side (a stamp-point
+total can't exceed what the top combo tier times every stamp collected
+would produce), not proven. This is a fine trade-off for a teaser where
+points are cosmetic, but if this evolves into the real Play pillar with
+meaningful rewards, see the Teaser Blueprint Part 5.11 for what a full
+anti-cheat pass needs (signed run tokens, server-side replay validation,
+rate limiting).
 
 ### Fraud review on referrals
 
@@ -220,18 +274,23 @@ src/
     layout.tsx             — fonts, metadata
     api/
       waitlist/route.ts    — signup, referral resolution, queue position
-      game-score/route.ts  — run submission, points, leaderboard update
+      game-score/route.ts  — run submission, points, level progress, daily challenge
       wheel-spin/route.ts  — server-authoritative spin outcome
       leaderboard/route.ts — national + state aggregates
+      leaderboard/players/route.ts — nationwide player ranking, by total stars
       player/route.ts      — profile, balance, ledger, streak
   components/
     Hero.tsx, CountdownTimer.tsx, GameArcade.tsx, RewardsPanel.tsx,
-    ReferralCard.tsx, Leaderboard.tsx, WaitlistForm.tsx, Footer.tsx
+    ReferralCard.tsx, Leaderboard.tsx, PlayerLeaderboard.tsx, WaitlistForm.tsx,
+    Footer.tsx
     games/RunUpGame.tsx, games/VybeWheel.tsx
   lib/
     db.ts, schema.ts       — Drizzle + better-sqlite3
     points.ts              — the one place points get awarded (audit-friendly)
     gate.ts                — the daily gate distance + referral code generation
+    levels.ts              — the five-level design, shared by client and server
+    dailyChallenge.ts      — today's challenge, deterministic by date
+    shareCard.ts           — the canvas share-card renderer + Web Share integration
     usePlayer.ts           — client-side identity, localStorage-backed
 ```
 

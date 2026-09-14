@@ -15,7 +15,7 @@ export default function WaitlistForm({
   referredByCode: string | null;
   onSuccess: (playerId: string, queuePosition: number, referralCode: string) => void;
 }) {
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", state: "", consentMarketing: false });
+  const [form, setForm] = useState({ username: "", firstName: "", lastName: "", email: "", phone: "", state: "", consentMarketing: false });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
   const [serverError, setServerError] = useState<string | null>(null);
@@ -26,6 +26,7 @@ export default function WaitlistForm({
     setServerError(null);
 
     const newErrors: Record<string, string> = {};
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(form.username)) newErrors.username = "3-20 characters — letters, numbers and underscores only.";
     if (!form.firstName.trim()) newErrors.firstName = "First name is required.";
     if (!form.lastName.trim()) newErrors.lastName = "Last name is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) newErrors.email = "Enter a valid email address.";
@@ -69,6 +70,17 @@ export default function WaitlistForm({
 
   return (
     <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-5">
+      <div className="flex flex-col gap-2">
+        <label className="text-xs font-medium text-inkdim">Username <span className="text-inkdim/70">— this is what shows on the leaderboard, not your real name</span></label>
+        <input
+          type="text"
+          value={form.username}
+          onChange={(e) => setForm((f) => ({ ...f, username: e.target.value.replace(/\s/g, "") }))}
+          placeholder="e.g. lagos_last_born"
+          className={`glass rounded-lg px-4 py-3.5 text-sm outline-none transition-colors focus:border-brand-gold/60 ${errors.username ? "!border-brand-red" : ""}`}
+        />
+        <span className="text-brand-red text-xs min-h-[1em]">{errors.username}</span>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {field("firstName", "First name")}
         {field("lastName", "Last name")}
@@ -106,20 +118,20 @@ export default function WaitlistForm({
       <p className="text-xs text-inkdim leading-relaxed">
         By joining, you agree to the{" "}
         <span className="underline decoration-dashed underline-offset-2">Terms &amp; Conditions</span>{" "}
-        {/* <span className="text-brand-orange text-[0.62rem] border border-dashed border-brand-orange/60 rounded px-1.5 py-0.5 ml-0.5">pending</span> */}
+        <span className="text-brand-orange text-[0.62rem] border border-dashed border-brand-orange/60 rounded px-1.5 py-0.5 ml-0.5">pending</span>
         {" "}and the{" "}
         <span className="underline decoration-dashed underline-offset-2">Data Privacy Notice</span>{" "}
-        {/* <span className="text-brand-orange text-[0.62rem] border border-dashed border-brand-orange/60 rounded px-1.5 py-0.5 ml-0.5">pending</span>. */}
+        <span className="text-brand-orange text-[0.62rem] border border-dashed border-brand-orange/60 rounded px-1.5 py-0.5 ml-0.5">pending</span>.
       </p>
 
       {serverError && <p className="text-brand-red text-sm">{serverError}</p>}
 
       <motion.button
-        whileHover={{ y: -2, boxShadow: "0 16px 40px -12px rgba(47,184,224,0.5)" }}
+        whileHover={{ y: -2, boxShadow: "0 16px 40px -12px rgba(224,173,15,0.45)" }}
         whileTap={{ scale: 0.98 }}
         type="submit"
         disabled={status === "submitting"}
-        className="bg-brand-gradient w-full text-white font-semibold px-8 py-4 rounded-xl disabled:opacity-60 shadow-[0_10px_30px_-10px_rgba(60,100,200,0.6)]"
+        className="bg-brand-gradient w-full text-night font-semibold px-8 py-4 rounded-xl disabled:opacity-60 shadow-[0_10px_30px_-10px_rgba(224,173,15,0.45)]"
       >
         {status === "submitting" ? "Claiming your place…" : "Claim your place"}
       </motion.button>

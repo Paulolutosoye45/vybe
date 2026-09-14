@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
 import { players, wheelSpins, globalAggregate } from "@/lib/schema";
 import { eq } from "drizzle-orm";
-import { awardPoints, getBalance, POINTS } from "@/lib/points";
+import { awardPoints, getBalance, POINTS, recordDailyPlay } from "@/lib/points";
 
 // Segment weights sum to 100. Server picks the winner — never trust a
 // client-chosen "I landed on the jackpot" claim.
@@ -43,14 +43,10 @@ export async function POST(req: NextRequest) {
   }
   const { playerId } = parsed.data;
 
-  const [player] = await db
-    .select()
-    .from(players)
-    .where(eq(players.id, playerId))
-    .limit(1);
+  const player = db.select().from(players).where(eq(players.id, playerId)).get();
   if (!player) return NextResponse.json({ error: "Unknown player" }, { status: 404 });
 
-  const balance = await getBalance(playerId);
+  const balance = getBalance(playerId);
   if (balance < POINTS.WHEEL_SPIN_COST) {
     return NextResponse.json(
       { error: "Not enough points to spin.", balance, cost: POINTS.WHEEL_SPIN_COST },
@@ -60,24 +56,20 @@ export async function POST(req: NextRequest) {
 
   const segment = pickSegment();
 
-  await db.insert(wheelSpins)
+  db.insert(wheelSpins)
     .values({ id: nanoid(), playerId, segmentLabel: segment.label, pointsWon: segment.value })
-    ;
+    .run();
 
-  const [global] = await db
-    .select()
-    .from(globalAggregate)
-    .where(eq(globalAggregate.id, "singleton"))
-    .limit(1);
+  const global = db.select().from(globalAggregate).where(eq(globalAggregate.id, "singleton")).get();
   if (!global) {
-    await db.insert(globalAggregate)
+    db.insert(globalAggregate)
       .values({ id: "singleton", totalSignups: 0, totalDistanceRunM: 0, totalRuns: 0, totalSpins: 1 })
-      ;
+      .run();
   } else {
-    await db.update(globalAggregate)
+    db.update(globalAggregate)
       .set({ totalSpins: global.totalSpins + 1 })
       .where(eq(globalAggregate.id, "singleton"))
-      ;
+      .run();
   }
 
   awardPoints(playerId, "wheel_spin", -POINTS.WHEEL_SPIN_COST, { segment: segment.label });
@@ -85,8 +77,9 @@ export async function POST(req: NextRequest) {
     awardPoints(playerId, "wheel_spin", segment.value, { segment: segment.label });
   }
 
-  const newBalance = await getBalance(playerId);
+  const newBalance = getBalance(playerId);
   const segmentIndex = SEGMENTS.findIndex((s) => s.label === segment.label);
+  const streakResult = recordDailyPlay(playerId);
 
   return NextResponse.json({
     segmentLabel: segment.label,
@@ -95,6 +88,10 @@ export async function POST(req: NextRequest) {
     pointsWon: segment.value,
     freeSpin: "freeSpin" in segment ? segment.freeSpin : false,
     newBalance,
+    streak: streakResult.streak,
+    streakNewlyExtended: streakResult.newlyExtended,
+    freezeConsumed: streakResult.freezeConsumed,
+    milestonesHit: streakResult.milestonesHit,
   });
 }
 

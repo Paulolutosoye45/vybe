@@ -22,14 +22,22 @@ const config: Config = {
           red: "#E23A3A",
           orange: "#F0A23C",
           green: "#7CC24A",
+          gold: "#E0AD0F",
         },
       },
       fontFamily: {
-        serif: ["var(--font-fraunces)", "Georgia", "serif"],
+        // Inter throughout — including anywhere the codebase still uses the
+        // font-serif utility class, so no component file needs to change to
+        // pick this up. See layout.tsx: Fraunces is no longer loaded at all.
+        serif: ["var(--font-inter)", "system-ui", "sans-serif"],
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
       },
       backgroundImage: {
-        "brand-gradient": "linear-gradient(135deg, #2E3F8C 0%, #3C64C8 52%, #2FB8E0 100%)",
+        // Secondary brand colour, used as the fill for every primary button
+        // in the app — a single utility redefinition instead of hunting
+        // down each button individually, so nothing gets missed and any
+        // future button picks this up automatically too.
+        "brand-gradient": "linear-gradient(135deg, #F5C542 0%, #E0AD0F 100%)",
       },
       animation: {
         "gradient-shift": "gradientShift 6s ease-in-out infinite",

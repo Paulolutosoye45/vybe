@@ -1,53 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { players, referralCodes, referralEvents } from "@/lib/schema";
+import { players, referralCodes, referralEvents, levelProgress, videoWatches } from "@/lib/schema";
 import { eq } from "drizzle-orm";
-import { getBalance, getLedger, awardPoints, POINTS } from "@/lib/points";
+import { getBalance, getLedger } from "@/lib/points";
 
 export async function GET(req: NextRequest) {
   const playerId = req.nextUrl.searchParams.get("playerId");
   if (!playerId) return NextResponse.json({ error: "playerId is required" }, { status: 400 });
 
-  const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
+  const player = db.select().from(players).where(eq(players.id, playerId)).get();
   if (!player) return NextResponse.json({ error: "Unknown player" }, { status: 404 });
 
-  const [myCode] = await db
+  const myCode = db
     .select()
     .from(referralCodes)
     .where(eq(referralCodes.id, player.referralCodeId))
-    .limit(1);
+    .get();
   const referralCount = myCode
-    ? (await db
-        .select()
-        .from(referralEvents)
-        .where(eq(referralEvents.referralCodeId, myCode.id))).length
+    ? db.select().from(referralEvents).where(eq(referralEvents.referralCodeId, myCode.id)).all().length
     : 0;
 
-  // Streak update happens on read — the first visit of a new calendar day
-  // ticks the streak forward, exactly once, no client-side trust required.
+  // Streak is no longer touched here — it only advances from an actual play
+  // action (see recordDailyPlay in points.ts, called from game-score and
+  // wheel-spin). This route just reports current status, including whether
+  // today's play has already happened, so the UI can say "play today to
+  // keep your streak" versus "you're set for today" honestly.
   const today = new Date().toISOString().slice(0, 10);
-  let streak = player.streak;
+  const playedToday = player.lastPlayDate === today;
+  const streak = player.streak;
+
+  // lastVisitDate stays a simple, honest "last time they opened the app"
+  // marker — separate from the streak, updated here with no point/streak
+  // side effects, since that distinction is the whole point of the rework.
   if (player.lastVisitDate !== today) {
-    const diffDays = Math.round(
-      (new Date(today).getTime() - new Date(player.lastVisitDate).getTime()) / 86400000
-    );
-    streak = diffDays === 1 ? streak + 1 : 1;
-    await db.update(players).set({ streak, lastVisitDate: today }).where(eq(players.id, playerId));
-    if (streak >= 2) {
-      awardPoints(playerId, "daily_streak", POINTS.DAILY_STREAK_BONUS, { streak });
-    }
+    db.update(players).set({ lastVisitDate: today }).where(eq(players.id, playerId)).run();
   }
 
   const balance = getBalance(playerId);
   const ledger = getLedger(playerId, 10);
+  const levels = db.select().from(levelProgress).where(eq(levelProgress.playerId, playerId)).all();
+  const watchedVideoIds = db
+    .select({ videoId: videoWatches.videoId })
+    .from(videoWatches)
+    .where(eq(videoWatches.playerId, playerId))
+    .all()
+    .map((w) => w.videoId);
 
   return NextResponse.json({
     firstName: player.firstName,
+    username: player.username,
     queuePosition: player.queuePosition,
     referralCode: myCode?.code ?? "",
     referralCount,
+    referralTier: player.referralTier,
     streak,
+    playedToday,
+    streakFreezes: player.streakFreezes,
+    longestStreak: player.longestStreak,
     balance,
     ledger,
+    levelProgress: levels,
+    watchedVideoIds,
+    bluutvSeriesCompleted: player.bluutvSeriesCompleted,
   });
 }

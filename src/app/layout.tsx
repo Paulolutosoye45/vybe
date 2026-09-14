@@ -2,15 +2,9 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
-// Self-hosted variable fonts, bundled at build time — no runtime request to
-// Google's CDN. Same visual result as next/font/google, but the font files
-// ship with the app itself, which matters for a low-data-first product.
-const fraunces = localFont({
-  src: "../fonts/fraunces.ttf",
-  variable: "--font-fraunces",
-  display: "swap",
-});
-
+// Self-hosted, bundled at build time — no runtime request to Google's CDN.
+// Inter only now, throughout the whole app (see tailwind.config.ts — the
+// old font-serif utility now points here too, so no component changed).
 const inter = localFont({
   src: "../fonts/inter.ttf",
   variable: "--font-inter",
@@ -30,7 +24,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${inter.variable}`}>
+    <html lang="en" className={inter.variable}>
       <body className="font-sans grain-overlay antialiased">
         <div className="aurora-field" aria-hidden="true">
           <div className="aurora-blob-3" />

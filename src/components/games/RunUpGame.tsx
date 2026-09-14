@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { LEVELS, levelForDistance, STAR_STAMP_RATIO, ObstacleKind, LevelDef } from "@/lib/levels";
+import { LEVELS, ZONE_LIST, levelForDistance, STAR_STAMP_RATIO, ObstacleKind, LevelDef } from "@/lib/levels";
 import { LevelProgressEntry } from "@/lib/usePlayer";
 
 type GamePhase = "tutorial" | "idle" | "running" | "paused" | "levelup" | "over";
@@ -21,6 +22,7 @@ const OVERHEAD_KINDS: ObstacleKind[] = ["banner", "steam", "rope", "drone", "con
 
 interface Obstacle { x: number; y: number; w: number; h: number; kind: ObstacleKind; hintShown?: boolean; }
 interface Stamp { x: number; y: number; r: number; taken: boolean; }
+interface Billboard { x: number; y: number; w: number; h: number; text: string; }
 interface LevelRunStats { collected: number; spawned: number; }
 export interface RunUpResult {
   distanceM: number;
@@ -31,6 +33,19 @@ export interface RunUpResult {
 }
 
 const TUTORIAL_KEY = "vybeRunUpTutorialSeen";
+
+// Rotating billboard copy — purely decorative, never collides, exists to sell
+// the real launch to a player who is already staring at the screen. A mix of
+// evergreen brand lines and specific launch-date lines.
+const BILLBOARD_COPY = [
+  "ACCESS IS THE VYBE",
+  "THE GATE OPENS 1 OCT",
+  "THE LIST DROPS 15 NOV",
+  "BRING A FRIEND. JUMP THE QUEUE.",
+  "HOMECOMING STARTS HERE",
+  "EVERY STAMP CARRIES INTO DECEMBER",
+  "NOTHING IS BOUGHT. EVERYTHING IS EARNED.",
+];
 
 export default function RunUpGame({
   gateDistanceToday,
@@ -58,11 +73,14 @@ export default function RunUpGame({
     frame: 0,
     player: { y: 0, vy: 0, sliding: 0, grounded: true, coyote: 0, holdFrames: 0, w: 34, h: 46 },
     obstacles: [] as Obstacle[],
+    billboards: [] as Billboard[],
     stamps: [] as Stamp[],
     stampsCollected: 0,
     stampPoints: 0,
     combo: 0,
     spawnTimer: 0,
+    stampSpawnTimer: -1,
+    billboardTimer: 900, // pixel-budget units, matches the decrement pattern
     glimpseSeen: false,
     gateFlashUntil: 0,
     worldOffset: 0,
@@ -95,7 +113,7 @@ export default function RunUpGame({
     const g = gameRef.current;
     g.distance = 0; g.speed = LEVELS[0].speedFrom; g.frame = 0;
     g.obstacles = []; g.stamps = []; g.stampsCollected = 0; g.stampPoints = 0; g.combo = 0;
-    g.spawnTimer = 0; g.glimpseSeen = false;
+    g.spawnTimer = 0; g.stampSpawnTimer = -1; g.billboardTimer = 900; g.billboards = []; g.glimpseSeen = false;
     g.player = { y: groundY(h) - 46, vy: 0, sliding: 0, grounded: true, coyote: 0, holdFrames: 0, w: 34, h: 46 };
     g.worldOffset = 0;
     g.currentLevelIdx = 0;
@@ -135,7 +153,7 @@ export default function RunUpGame({
       const stats = g.levelStats[L.level] || { collected: 0, spawned: 0 };
       let stars = 0;
       let distanceReached: number;
-      if (L.level === 5) {
+      if (L.distanceTo === null) {
         distanceReached = distM;
         if (distM >= L.distanceFrom) stars = 1;
         if (stats.collected >= 8) stars = Math.max(stars, 2);
@@ -206,6 +224,13 @@ export default function RunUpGame({
       const stats = g.levelStats[level.level] || { collected: 0, spawned: 0 };
       stats.spawned++;
       g.levelStats[level.level] = stats;
+    }
+    function spawnBillboard() {
+      const g = gameRef.current;
+      const rect = canvas!.getBoundingClientRect();
+      const text = BILLBOARD_COPY[Math.floor(Math.random() * BILLBOARD_COPY.length)];
+      const w = Math.min(260, 40 + text.length * 8.5);
+      g.billboards.push({ x: rect.width + 60, y: 26, w, h: 40, text });
     }
 
     function drawPlayer(px: number, p: typeof gameRef.current.player) {
@@ -284,6 +309,29 @@ export default function RunUpGame({
       ctx.restore();
     }
 
+    // Purely decorative — never enters the collision array. A billboard
+    // posted on the skyline selling the real launch, since gameplay is the
+    // moment a player's attention is most concentrated on the screen.
+    function drawBillboard(b: Billboard, accent: string) {
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = "rgba(4,10,20,0.55)";
+      if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 5); ctx.fill(); }
+      else ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = accent; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.6;
+      if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 5); ctx.stroke(); }
+      // two support posts, like real roadside signage
+      ctx.fillStyle = "rgba(140,158,196,0.35)";
+      ctx.fillRect(b.x + 8, b.y + b.h, 3, 14);
+      ctx.fillRect(b.x + b.w - 11, b.y + b.h, 3, 14);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#F4F6FA";
+      ctx.font = "700 10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(b.text, b.x + b.w / 2, b.y + b.h / 2 + 3, b.w - 10);
+      ctx.restore();
+    }
+
     function tick() {
       const g = gameRef.current;
       const rect = canvas!.getBoundingClientRect();
@@ -319,11 +367,41 @@ export default function RunUpGame({
         } else if (p.coyote > 0) p.coyote--;
         if (p.sliding > 0) p.sliding--;
 
+        // ---- SPACING: a guaranteed-safe minimum gap, never eroded by unlucky
+        // randomness stacking with speed (that stacking was the actual bug
+        // behind "obstacles feel clustered" — see /tmp/spacing_analysis.js
+        // reasoning: old formula could drop to ~800ms at top speed, well
+        // under a fair reaction+recovery window). Floor now never drops
+        // below 85 frames (~1.4s) even at max speed; random variety is
+        // added on top of the floor, never subtracted from it.
         g.spawnTimer -= g.speed;
         if (g.spawnTimer <= 0) {
           spawnObstacle(level);
-          if (Math.random() < 0.55) spawnStamp(level);
-          g.spawnTimer = 92 + Math.random() * 100 - g.speed * 2.6;
+          // spawnTimer depletes by `speed` px each frame (a pixel-budget,
+          // not a frame counter) — the refill must be expressed in the same
+          // units, i.e. minGapFrames * speed, or the actual real-world gap
+          // silently shrinks by a factor of `speed` versus what's intended.
+          // (This exact mismatch was the bug behind the first spacing fix
+          // not actually taking effect — verified via direct gap measurement.)
+          const minGapFrames = Math.max(85, 105 - (g.speed - 6) * 1.8);
+          const gap = (minGapFrames + Math.random() * 70) * g.speed;
+          g.spawnTimer = gap;
+          // stamps live in the open space between obstacles, not on top of
+          // one — armed for ~70% of gaps so some gaps stay obstacle-only.
+          g.stampSpawnTimer = Math.random() < 0.7 ? gap * (0.38 + Math.random() * 0.2) : -1;
+        }
+        if (g.stampSpawnTimer >= 0) {
+          g.stampSpawnTimer -= g.speed;
+          if (g.stampSpawnTimer <= 0) {
+            spawnStamp(level);
+            g.stampSpawnTimer = -1;
+          }
+        }
+
+        g.billboardTimer -= g.speed;
+        if (g.billboardTimer <= 0) {
+          spawnBillboard();
+          g.billboardTimer = (620 + Math.random() * 260) * g.speed; // same unit fix — same-units pixel-budget
         }
 
         const px = 90, pw = p.w, ph = p.sliding > 0 ? p.h * 0.55 : p.h;
@@ -339,6 +417,10 @@ export default function RunUpGame({
             endRunRef.current();
             break;
           }
+        }
+        for (let i = g.billboards.length - 1; i >= 0; i--) {
+          const b = g.billboards[i]; b.x -= g.speed * 0.7; // slightly slower — reads as further back
+          if (b.x < -b.w - 20) g.billboards.splice(i, 1);
         }
         for (let i = g.stamps.length - 1; i >= 0; i--) {
           const s = g.stamps[i]; s.x -= g.speed;
@@ -403,6 +485,7 @@ export default function RunUpGame({
       ctx.beginPath(); ctx.moveTo(-(g.worldOffset % 32), gy + 16); ctx.lineTo(w, gy + 16); ctx.stroke();
       ctx.setLineDash([]);
 
+      g.billboards.forEach((b) => drawBillboard(b, level.palette.accent));
       g.stamps.forEach(drawStamp);
       g.obstacles.forEach(drawObstacle);
       drawPlayer(90, g.player);
@@ -463,7 +546,7 @@ export default function RunUpGame({
                 initial={{ opacity: 0, y: 6, scale: 0.8 }}
                 animate={{ opacity: 1, y: -2, scale: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute -top-2 -right-2 bg-brand-gradient text-white text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full"
+                className="absolute -top-2 -right-2 bg-brand-gradient text-night text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full"
               >
                 x{hudCombo < 10 ? 2 : 3}
               </motion.div>
@@ -471,7 +554,7 @@ export default function RunUpGame({
           </AnimatePresence>
         </div>
         <div className="glass rounded-lg px-3 py-2 text-right">
-          <div className="text-[0.58rem] tracking-wider text-inkdim uppercase">Level {hudLevel.level}/5</div>
+          <div className="text-[0.58rem] tracking-wider text-inkdim uppercase">Level {hudLevel.level}/{LEVELS.length}</div>
           <div className="font-serif text-sm font-semibold" style={{ color: hudLevel.palette.accent }}>{hudLevel.name}</div>
         </div>
       </div>
@@ -500,11 +583,24 @@ export default function RunUpGame({
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -14 }}
-            className="absolute inset-0 flex items-center justify-center bg-night/55 backdrop-blur-[2px]"
+            className="absolute inset-0 flex items-center justify-center overflow-hidden"
           >
-            <div className="text-center px-6">
+            <div className="absolute inset-0">
+              <Image
+                src={levelUpInfo.banner}
+                alt={levelUpInfo.zoneName}
+                fill
+                sizes="600px"
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-night/70 backdrop-blur-[2px]" />
+            </div>
+            <div className="relative text-center px-6">
+              <div className="text-[0.62rem] font-semibold tracking-[0.18em] uppercase mb-1.5 text-inkdim">
+                {levelUpInfo.zoneName} &middot; Zone {levelUpInfo.zoneIndex + 1} of 6
+              </div>
               <div className="text-xs font-semibold tracking-[0.2em] uppercase mb-2" style={{ color: levelUpInfo.palette.accent }}>
-                Level {levelUpInfo.level} of 5 &middot; {levelUpInfo.pillar}
+                Level {levelUpInfo.level} of {LEVELS.length} &middot; {levelUpInfo.pillar}
               </div>
               <div className="font-serif text-3xl sm:text-4xl font-bold mb-2">{levelUpInfo.name}</div>
               <div className="text-inkdim text-sm">{levelUpInfo.subtitle}</div>
@@ -525,35 +621,54 @@ export default function RunUpGame({
                 {phase === "idle" ? "Nobody's gotten in yet." : "Run again?"}
               </h3>
               <p className="text-inkdim max-w-sm text-sm leading-relaxed">
-                The gate is {gateDistanceToday.toLocaleString()}m away today. Five stops between here and
-                there &mdash; jump the cones, slide the banners, chase the glow.
+                The gate is {gateDistanceToday.toLocaleString()}m away today. Thirty levels across six
+                stops between here and there &mdash; jump the cones, slide the banners, chase the glow.
               </p>
-              <div className="flex items-center gap-1.5">
-                {LEVELS.map((l) => (
-                  <div key={l.level} className="flex flex-col items-center gap-1">
+              <div className="w-full max-w-lg overflow-x-auto px-1 pb-1" style={{ scrollSnapType: "x proximity" }}>
+                <div className="flex items-start gap-3 w-max mx-auto">
+                  {ZONE_LIST.map((zone) => (
                     <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold border"
-                      style={{
-                        borderColor: bestStars(l.level) > 0 ? l.palette.accent : "rgba(148,163,196,0.25)",
-                        color: bestStars(l.level) > 0 ? l.palette.accent : "#8B98B8",
-                        background: bestStars(l.level) > 0 ? `${l.palette.accent}14` : "transparent",
-                      }}
+                      key={zone.key}
+                      className="flex flex-col items-center gap-2 glass rounded-xl p-2.5 shrink-0"
+                      style={{ scrollSnapAlign: "start", width: 132 }}
                     >
-                      {l.level}
+                      <div className="relative w-full h-14 rounded-lg overflow-hidden">
+                        <Image src={zone.banner} alt={zone.name} fill sizes="132px" className="object-cover" />
+                        <div className="absolute inset-0 bg-night/35" />
+                      </div>
+                      <div className="text-[0.62rem] font-semibold uppercase tracking-wide text-inkdim text-center leading-tight">
+                        {zone.name}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {LEVELS.filter((l) => l.zoneIndex === zone.zoneIndex).map((l) => (
+                          <div key={l.level} className="flex flex-col items-center gap-0.5">
+                            <div
+                              className="w-6 h-6 rounded-md flex items-center justify-center text-[0.62rem] font-bold border"
+                              style={{
+                                borderColor: bestStars(l.level) > 0 ? l.palette.accent : "rgba(148,163,196,0.25)",
+                                color: bestStars(l.level) > 0 ? l.palette.accent : "#8B98B8",
+                                background: bestStars(l.level) > 0 ? `${l.palette.accent}14` : "transparent",
+                              }}
+                            >
+                              {l.level}
+                            </div>
+                            <div className="flex gap-px">
+                              {[1, 2, 3].map((n) => (
+                                <span key={n} className={`text-[6px] ${bestStars(l.level) >= n ? "text-brand-orange" : "text-white/15"}`}>&#9733;</span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3].map((n) => (
-                        <span key={n} className={`text-[8px] ${bestStars(l.level) >= n ? "text-brand-orange" : "text-white/15"}`}>&#9733;</span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </>
           )}
           <button
             onClick={phase === "paused" ? () => setPhase("running") : startRun}
-            className="bg-brand-gradient text-white font-semibold px-6 sm:px-7 py-3 sm:py-3.5 rounded-xl shadow-[0_10px_30px_-10px_rgba(60,100,200,0.65)]"
+            className="bg-brand-gradient text-night font-semibold px-6 sm:px-7 py-3 sm:py-3.5 rounded-xl shadow-[0_10px_30px_-10px_rgba(224,173,15,0.45)]"
           >
             {phase === "paused" ? "Resume" : phase === "over" ? "Run again" : "Start running"}
           </button>
@@ -593,7 +708,7 @@ function Tutorial({ onDone }: { onDone: () => void }) {
       </div>
       <button
         onClick={() => (step < steps.length - 1 ? setStep(step + 1) : onDone())}
-        className="bg-brand-gradient text-white font-semibold px-7 py-3 rounded-xl"
+        className="bg-brand-gradient text-night font-semibold px-7 py-3 rounded-xl"
       >
         {step < steps.length - 1 ? "Next" : "Let's go"}
       </button>

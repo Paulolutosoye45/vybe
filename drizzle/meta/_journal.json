@@ -12,8 +12,36 @@
     {
       "idx": 1,
       "version": "6",
-      "when": 1788887338608,
-      "tag": "0001_dark_lyja",
+      "when": 1788870491256,
+      "tag": "0001_round_lila_cheney",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788884454338,
+      "tag": "0002_worthless_ares",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789366129390,
+      "tag": "0003_dry_mockingbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789369171499,
+      "tag": "0004_woozy_mastermind",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789385707157,
+      "tag": "0005_brave_hitman",
       "breakpoints": true
     }
   ]

@@ -10,13 +10,20 @@ export interface LevelProgressEntry {
 
 export interface PlayerProfile {
   firstName: string;
+  username: string;
   queuePosition: number;
   referralCode: string;
   referralCount: number;
+  referralTier: number;
   streak: number;
+  playedToday: boolean;
+  streakFreezes: number;
+  longestStreak: number;
   balance: number;
   ledger: { id: string; source: string; amount: number; createdAt: string }[];
   levelProgress: LevelProgressEntry[];
+  watchedVideoIds: string[];
+  bluutvSeriesCompleted: boolean;
 }
 
 const STORAGE_KEY = "vybePlayerId";

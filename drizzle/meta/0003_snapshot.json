@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "acd055be-17f5-48c7-b659-01742e271eba",
-  "prevId": "4fd23454-7a73-4b1e-b1a8-be4679616f83",
+  "id": "fae83add-0c8f-4a5b-b2e8-0b7e5b5f8e06",
+  "prevId": "1bc0d177-6821-4c41-af88-6913274a7c70",
   "tables": {
     "game_sessions": {
       "name": "game_sessions",
@@ -278,13 +278,27 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1
+          "default": 0
         },
         "last_visit_date": {
           "name": "last_visit_date",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "last_play_date": {
+          "name": "last_play_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "daily_challenge_date": {
+          "name": "daily_challenge_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "referral_code_id": {
@@ -495,6 +509,45 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "video_watches": {
+      "name": "video_watches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "player_id": {
+          "name": "player_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "video_id": {
+          "name": "video_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "watched_at": {
+          "name": "watched_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(current_timestamp)"
         }
       },
       "indexes": {},
