@@ -87,6 +87,7 @@ function Navbar({
               height={20}
               priority
               className="drop-shadow-[0_8px_30px_rgba(47,184,224,0.25)]"
+              loading="eager"
             />
           </div>
         </div>
@@ -115,7 +116,7 @@ function Navbar({
           )}
           <button
             onClick={onJoinClick}
-            className="text-sm font-semibold px-4 py-2 rounded-full bg-brand-cyan text-black hover:opacity-90 transition-opacity"
+            className="text-sm bg-brand-gradient font-semibold px-4 py-2 rounded-full text-black hover:opacity-90 transition-opacity"
           >
             Join waitlist
           </button>
@@ -170,7 +171,7 @@ function Navbar({
                     setIsMenuOpen(false);
                     onJoinClick();
                   }}
-                  className="w-full text-center text-sm font-semibold px-4 py-3 rounded-full bg-brand-cyan text-black"
+                  className="w-full bg-brand-gradient text-center text-sm font-semibold px-4 py-3 rounded-full text-black"
                 >
                   Join waitlist
                 </button>

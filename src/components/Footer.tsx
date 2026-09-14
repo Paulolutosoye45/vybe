@@ -7,7 +7,7 @@ export default function Footer() {
     <footer className="border-t border-white/[0.06] py-10">
       <div className="max-w-5xl mx-auto px-6 sm:px-8 flex flex-wrap items-center justify-between gap-5 text-sm text-inkdim">
         <div className="flex items-center gap-3">
-          <Image src="/diav-logo.webp" alt="" width={52} height={46} className="opacity-75" />
+          <Image src="/diav-logo.webp" alt="" width={52} height={46} className="opacity-75" loading="eager" />
           <span>December Issa Vybe — Access Is The Vybe.</span>
         </div>
         <div className="flex flex-wrap gap-6">
