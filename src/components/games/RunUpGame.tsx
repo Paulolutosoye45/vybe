@@ -8,6 +8,17 @@ import { LevelProgressEntry } from "@/lib/usePlayer";
 
 type GamePhase = "tutorial" | "idle" | "running" | "paused" | "levelup" | "over";
 
+// Every zone's accent in levels.ts is a plain #rrggbb hex — this turns one
+// into an rgba() string at a given alpha, used to tint obstacle outlines
+// per stage without needing a second colour format in the level data.
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 const PHYS = {
   gravity: 0.62,
   jumpVelocity: -12.4,
@@ -263,7 +274,7 @@ export default function RunUpGame({
       ctx.lineTo(cx + w * 0.14 + phase2 * w * 0.06, py + h); ctx.stroke();
     }
 
-    function drawObstacle(o: Obstacle) {
+    function drawObstacle(o: Obstacle, zoneAccent: string) {
       const flavorColors: Record<ObstacleKind, string> = {
         trolley: "#5b6b8c", banner: "#8a5a22", danfo: "#233b66", okada: "#3b4f78",
         pothole: "#1a2436", steam: "#6b7b8f", crowd: "#42305c", speaker: "#2a2a2a",
@@ -274,11 +285,17 @@ export default function RunUpGame({
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(o.x, o.y, o.w, o.h, 4); else ctx.rect(o.x, o.y, o.w, o.h);
       ctx.fill();
+      // The pulsing outline carries the current zone's accent colour, not a
+      // fixed red — this is what actually gives each of the six stages its
+      // own visual identity as you play, on top of the sky/ground palette
+      // already differing per zone. Kind-based fill colour stays fixed
+      // (that's what keeps "which obstacle is this" legible at speed);
+      // only the glow shifts with the stage.
       const pulse = 0.55 + Math.sin(gameRef.current.frame * 0.15) * 0.25;
-      ctx.strokeStyle = `rgba(226,58,58,${pulse})`;
+      ctx.strokeStyle = hexToRgba(zoneAccent, pulse);
       ctx.lineWidth = 2;
       ctx.stroke();
-      ctx.strokeStyle = "rgba(240,162,60,0.65)";
+      ctx.strokeStyle = hexToRgba(zoneAccent, 0.65);
       ctx.lineWidth = 2;
       for (let sx = o.x + 2; sx < o.x + o.w - 2; sx += 8) {
         ctx.beginPath(); ctx.moveTo(sx, o.y); ctx.lineTo(sx + 4, o.y + 4); ctx.stroke();
@@ -383,8 +400,16 @@ export default function RunUpGame({
           // silently shrinks by a factor of `speed` versus what's intended.
           // (This exact mismatch was the bug behind the first spacing fix
           // not actually taking effect — verified via direct gap measurement.)
-          const minGapFrames = Math.max(85, 105 - (g.speed - 6) * 1.8);
-          const gap = (minGapFrames + Math.random() * 70) * g.speed;
+          // Floor tightened from the original spacing fix — that fix solved
+          // "obstacles feel clustered and unfair" correctly, but landed too
+          // far the other way once players reported the game had become
+          // too easy. This floor is still comfortably above the reaction+
+          // recovery minimum (~950-1000ms: ~300ms reaction + ~670ms jump
+          // airtime) even at the game's top speed, verified in
+          // /tmp/rebalance_check.js, but meaningfully denser throughout —
+          // roughly 25-35% tighter gaps across the whole 30-level range.
+          const minGapFrames = Math.max(58, 78 - (g.speed - 6) * 1.4);
+          const gap = (minGapFrames + Math.random() * 45) * g.speed;
           g.spawnTimer = gap;
           // stamps live in the open space between obstacles, not on top of
           // one — armed for ~70% of gaps so some gaps stay obstacle-only.
@@ -487,7 +512,7 @@ export default function RunUpGame({
 
       g.billboards.forEach((b) => drawBillboard(b, level.palette.accent));
       g.stamps.forEach(drawStamp);
-      g.obstacles.forEach(drawObstacle);
+      g.obstacles.forEach((o) => drawObstacle(o, level.palette.accent));
       drawPlayer(90, g.player);
 
       rafRef.current = requestAnimationFrame(tick);
@@ -503,8 +528,18 @@ export default function RunUpGame({
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      // Space/ArrowUp/ArrowDown must never trigger the browser's native
+      // scroll — checked and suppressed before anything else, regardless
+      // of phase. The tutorial-phase check below only skips the game
+      // ACTIONS (jump/slide), never the preventDefault, since the old
+      // early-return skipped both — meaning every new player's first-ever
+      // keypress, taken on the tutorial screen that explicitly teaches
+      // "press Space to jump", scrolled the page instead of doing anything.
+      if (e.code === "Space" || e.code === "ArrowUp" || e.code === "ArrowDown") {
+        e.preventDefault();
+      }
       if (phaseRef.current === "tutorial") return;
-      if (e.code === "Space" || e.code === "ArrowUp") { e.preventDefault(); jump(); }
+      if (e.code === "Space" || e.code === "ArrowUp") jump();
       if (e.code === "ArrowDown") startSlide();
       if (e.code === "KeyP") setPhase((s) => (s === "running" ? "paused" : s === "paused" ? "running" : s));
     }

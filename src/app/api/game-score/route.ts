@@ -6,7 +6,7 @@ import { players, gameSessions, globalAggregate, stateAggregate, levelProgress }
 import { eq, and } from "drizzle-orm";
 import { awardPoints, POINTS, recordDailyPlay } from "@/lib/points";
 import { gateDistanceToday } from "@/lib/gate";
-import { todaysChallenge, DAILY_CHALLENGE_BONUS } from "@/lib/dailyChallenge";
+import { todaysRunUpChallenge, DIFFICULTY_BONUS } from "@/lib/dailyChallenge";
 import { LEVELS } from "@/lib/levels";
 
 const LevelResultSchema = z.object({
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
   // ---- Daily Vybe Challenge — same challenge for everyone, rotates by
   // date, checked from this run's own data, awarded at most once per day ----
   const today = now.slice(0, 10);
-  const challenge = todaysChallenge();
+  const challenge = todaysRunUpChallenge();
   const satisfiesToday = challenge.check({ levelResults, stamps, reachedGate });
   const alreadyCompletedToday = player.dailyChallengeDate === today;
   const dailyChallengeNewlyCompleted = satisfiesToday && !alreadyCompletedToday;
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
     safeStampPoints +
     starBonusPoints +
     (reachedGate ? POINTS.RUN_UP_GLIMPSE_BONUS : 0) +
-    (dailyChallengeNewlyCompleted ? DAILY_CHALLENGE_BONUS : 0);
+    (dailyChallengeNewlyCompleted ? DIFFICULTY_BONUS[challenge.difficulty] : 0);
 
   db.insert(gameSessions)
     .values({ id: nanoid(), playerId, game: "run-up", distanceM, stamps, reachedGate, pointsEarned })
@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
     gateDistanceToday: gate,
     starBonusPoints,
     levelProgress: updatedLevelProgress,
-    dailyChallenge: { label: challenge.label, satisfiedToday: satisfiesToday || alreadyCompletedToday, newlyCompleted: dailyChallengeNewlyCompleted },
+    dailyChallenge: { label: challenge.label, difficulty: challenge.difficulty, bonus: DIFFICULTY_BONUS[challenge.difficulty], satisfiedToday: satisfiesToday || alreadyCompletedToday, newlyCompleted: dailyChallengeNewlyCompleted },
     streak: streakResult.streak,
     streakNewlyExtended: streakResult.newlyExtended,
     freezeConsumed: streakResult.freezeConsumed,

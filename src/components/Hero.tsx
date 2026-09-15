@@ -16,7 +16,7 @@ export default function Hero({
   onJoinClick: () => void;
 }) {
   return (
-    <section className="relative min-h-[94vh] md:mt-16 flex flex-col justify-center overflow-hidden">
+    <section className="relative min-h-[94vh] mt-16 flex flex-col justify-center overflow-hidden">
       {/* Real video background — muted/looped/autoplay. The aurora field
           behind everything means this still reads rich even before the
           video decodes, and degrades gracefully if it never does. */}

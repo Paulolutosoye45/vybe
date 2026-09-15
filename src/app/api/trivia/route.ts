@@ -6,11 +6,13 @@ import { players, triviaAttempts } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import { awardPoints, POINTS, recordDailyPlay } from "@/lib/points";
 import { todaysTriviaRound, publicRound } from "@/lib/trivia";
+import { todaysTriviaChallenge, DIFFICULTY_BONUS } from "@/lib/dailyChallenge";
 
 export async function GET(req: NextRequest) {
   const playerId = req.nextUrl.searchParams.get("playerId");
   const round = todaysTriviaRound();
   const today = new Date().toISOString().slice(0, 10);
+  const challenge = todaysTriviaChallenge();
 
   let alreadyPlayed = false;
   let previousScore: number | null = null;
@@ -30,6 +32,7 @@ export async function GET(req: NextRequest) {
     questions: publicRound(round),
     alreadyPlayed,
     previousScore,
+    dailyChallenge: { label: challenge.label, difficulty: challenge.difficulty, bonus: DIFFICULTY_BONUS[challenge.difficulty], minCorrect: challenge.minCorrect },
   });
 }
 
@@ -82,16 +85,31 @@ export async function POST(req: NextRequest) {
 
   db.insert(triviaAttempts).values({ id: nanoid(), playerId, date: today, correctCount, pointsEarned }).run();
   awardPoints(playerId, "trivia", pointsEarned, { correctCount });
+
+  // Trivia only allows one attempt per day (see the `existing` check above),
+  // so the challenge is evaluated exactly once, right here, rather than
+  // needing its own idempotency guard the way the Wheel's spin-count
+  // challenge does.
+  const challenge = todaysTriviaChallenge();
+  const challengeMet = correctCount >= challenge.minCorrect;
+  let challengeBonus = 0;
+  if (challengeMet) {
+    challengeBonus = DIFFICULTY_BONUS[challenge.difficulty];
+    db.update(players).set({ triviaChallengeDate: today }).where(eq(players.id, playerId)).run();
+    awardPoints(playerId, "trivia_challenge", challengeBonus, { challenge: challenge.id });
+  }
+
   const streakResult = recordDailyPlay(playerId);
 
   return NextResponse.json({
     correctCount,
-    pointsEarned,
+    pointsEarned: pointsEarned + challengeBonus,
     alreadyPlayed: false,
     correctAnswers: Object.fromEntries(round.map((q) => [q.id, q.correctIndex])),
     streak: streakResult.streak,
     streakNewlyExtended: streakResult.newlyExtended,
     freezeConsumed: streakResult.freezeConsumed,
     milestonesHit: streakResult.milestonesHit,
+    dailyChallenge: { label: challenge.label, difficulty: challenge.difficulty, bonus: DIFFICULTY_BONUS[challenge.difficulty], minCorrect: challenge.minCorrect, satisfiedToday: challengeMet, newlyCompleted: challengeMet },
   });
 }

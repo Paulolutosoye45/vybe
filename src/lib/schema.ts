@@ -51,7 +51,9 @@ export const players = sqliteTable("players", {
   streak: integer("streak").notNull().default(0),
   lastVisitDate: text("last_visit_date").notNull(), // "YYYY-MM-DD" — last time they opened the app at all
   lastPlayDate: text("last_play_date"), // "YYYY-MM-DD" — last date a streak-qualifying action (run or spin) happened; this, not lastVisitDate, is what the streak counts
-  dailyChallengeDate: text("daily_challenge_date"), // last date today's Vybe Challenge was completed
+  dailyChallengeDate: text("daily_challenge_date"), // last date today's Run Up challenge was completed
+  wheelChallengeDate: text("wheel_challenge_date"), // last date today's Wheel challenge was completed
+  triviaChallengeDate: text("trivia_challenge_date"), // last date today's trivia challenge (score threshold) was completed
 
   referralCodeId: text("referral_code_id").notNull().unique(),
   referredByCodeId: text("referred_by_code_id"),

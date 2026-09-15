@@ -69,7 +69,7 @@ export default function WaitlistForm({
   );
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-5">
+    <form onSubmit={handleSubmit} className="max-w-xl space-y-5">
       <div className="flex flex-col gap-2">
         <label className="text-xs font-medium text-inkdim">Username <span className="text-inkdim/70">— this is what shows on the leaderboard, not your real name</span></label>
         <input

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { players, wheelSpins, globalAggregate } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { awardPoints, getBalance, POINTS, recordDailyPlay } from "@/lib/points";
+import { todaysWheelChallenge, DIFFICULTY_BONUS } from "@/lib/dailyChallenge";
 
 // Segment weights sum to 100. Server picks the winner — never trust a
 // client-chosen "I landed on the jackpot" claim.
@@ -81,25 +82,51 @@ export async function POST(req: NextRequest) {
   const segmentIndex = SEGMENTS.findIndex((s) => s.label === segment.label);
   const streakResult = recordDailyPlay(playerId);
 
+  // The Wheel's daily challenge — participation-based (spin count), not a
+  // lucky outcome, since the wheel has no skill dimension to reward
+  // honestly. Counts every spin today, including this one just recorded.
+  const today = new Date().toISOString().slice(0, 10);
+  const challenge = todaysWheelChallenge();
+  const todaysSpins = db.select().from(wheelSpins).where(eq(wheelSpins.playerId, playerId)).all()
+    .filter((s) => s.createdAt.slice(0, 10) === today).length;
+  const alreadyCompletedChallenge = player.wheelChallengeDate === today;
+  const challengeNewlyCompleted = !alreadyCompletedChallenge && todaysSpins >= challenge.spinsRequired;
+  if (challengeNewlyCompleted) {
+    db.update(players).set({ wheelChallengeDate: today }).where(eq(players.id, playerId)).run();
+    awardPoints(playerId, "wheel_challenge", DIFFICULTY_BONUS[challenge.difficulty], { challenge: challenge.id });
+  }
+  const finalBalance = challengeNewlyCompleted ? getBalance(playerId) : newBalance;
+
   return NextResponse.json({
     segmentLabel: segment.label,
     segmentIndex,
     totalSegments: SEGMENTS.length,
     pointsWon: segment.value,
     freeSpin: "freeSpin" in segment ? segment.freeSpin : false,
-    newBalance,
+    newBalance: finalBalance,
     streak: streakResult.streak,
     streakNewlyExtended: streakResult.newlyExtended,
     freezeConsumed: streakResult.freezeConsumed,
     milestonesHit: streakResult.milestonesHit,
+    dailyChallenge: {
+      label: challenge.label,
+      difficulty: challenge.difficulty,
+      bonus: DIFFICULTY_BONUS[challenge.difficulty],
+      spinsRequired: challenge.spinsRequired,
+      spinsToday: todaysSpins,
+      satisfiedToday: alreadyCompletedChallenge || challengeNewlyCompleted,
+      newlyCompleted: challengeNewlyCompleted,
+    },
   });
 }
 
 export async function GET() {
   // Exposes the wheel's own segment list so the frontend never hardcodes
   // a second copy that could drift out of sync with the payout logic.
+  const challenge = todaysWheelChallenge();
   return NextResponse.json({
     segments: SEGMENTS.map((s) => ({ label: s.label })),
     cost: POINTS.WHEEL_SPIN_COST,
+    dailyChallenge: { label: challenge.label, difficulty: challenge.difficulty, bonus: DIFFICULTY_BONUS[challenge.difficulty], spinsRequired: challenge.spinsRequired },
   });
 }

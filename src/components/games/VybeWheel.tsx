@@ -12,7 +12,10 @@ interface SpinResult {
   pointsWon: number;
   freeSpin: boolean;
   newBalance: number;
+  dailyChallenge?: { label: string; difficulty: string; bonus: number; spinsRequired: number; spinsToday: number; satisfiedToday: boolean; newlyCompleted: boolean };
 }
+
+const DIFFICULTY_COLOR: Record<string, string> = { easy: "#7CC24A", medium: "#F0A23C", hard: "#E23A3A" };
 
 export default function VybeWheel({
   playerId,
@@ -30,11 +33,15 @@ export default function VybeWheel({
   const [spinning, setSpinning] = useState(false);
   const [lastResult, setLastResult] = useState<SpinResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [challenge, setChallenge] = useState<{ label: string; difficulty: string; bonus: number; spinsRequired: number } | null>(null);
 
   useEffect(() => {
     fetch("/api/wheel-spin")
       .then((r) => r.json())
-      .then((data) => setSegments(data.segments))
+      .then((data) => {
+        setSegments(data.segments);
+        if (data.dailyChallenge) setChallenge(data.dailyChallenge);
+      })
       .catch(() => setSegments(Array.from({ length: 7 }, (_, i) => ({ label: `Segment ${i + 1}` }))));
   }, []);
 
@@ -84,8 +91,35 @@ export default function VybeWheel({
     return `M ${center} ${center} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
   }
 
+  // Live progress comes from the last spin's response once one exists;
+  // before that, we only know the challenge's definition, not how many
+  // spins today count toward it.
+  const progress = lastResult?.dailyChallenge;
+  const spinsToday = progress?.spinsToday ?? 0;
+
   return (
     <div className="flex flex-col items-center gap-6">
+      {challenge && (
+        <div className="glass rounded-xl px-4 sm:px-5 py-3 flex items-center gap-3 w-full max-w-md">
+          <span
+            className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0"
+            style={{ color: DIFFICULTY_COLOR[challenge.difficulty], background: `${DIFFICULTY_COLOR[challenge.difficulty]}1a` }}
+          >
+            {challenge.difficulty}
+          </span>
+          <span className="text-sm flex-1">
+            <span className="text-inkdim">Today&rsquo;s Challenge:</span> <span className="font-medium">{challenge.label}</span>
+          </span>
+          {progress?.satisfiedToday ? (
+            <span className="text-xs font-semibold text-brand-green shrink-0">
+              {progress.newlyCompleted ? `+${challenge.bonus} just now \u2713` : "Done today \u2713"}
+            </span>
+          ) : (
+            <span className="text-xs text-inkdim shrink-0">{spinsToday}/{challenge.spinsRequired}</span>
+          )}
+        </div>
+      )}
+
       <div className="relative w-[300px] h-[300px]">
         <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[22px] border-t-brand-orange drop-shadow-lg" />
         <motion.svg

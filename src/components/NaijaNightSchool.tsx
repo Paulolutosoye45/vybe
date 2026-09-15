@@ -11,6 +11,10 @@ interface Question {
   options: string[];
 }
 
+interface Challenge { label: string; difficulty: string; bonus: number; minCorrect: number; }
+
+const DIFFICULTY_COLOR: Record<string, string> = { easy: "#7CC24A", medium: "#F0A23C", hard: "#E23A3A" };
+
 export default function NaijaNightSchool({
   playerId,
   onNeedSignup,
@@ -24,9 +28,10 @@ export default function NaijaNightSchool({
   const [loading, setLoading] = useState(true);
   const [alreadyPlayed, setAlreadyPlayed] = useState(false);
   const [previousScore, setPreviousScore] = useState<number | null>(null);
+  const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [result, setResult] = useState<{ correctCount: number; pointsEarned: number } | null>(null);
+  const [result, setResult] = useState<{ correctCount: number; pointsEarned: number; challengeMet?: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -38,6 +43,7 @@ export default function NaijaNightSchool({
         setQuestions(data.questions);
         setAlreadyPlayed(data.alreadyPlayed);
         setPreviousScore(data.previousScore);
+        if (data.dailyChallenge) setChallenge(data.dailyChallenge);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -65,7 +71,7 @@ export default function NaijaNightSchool({
         }),
       });
       const data = await res.json();
-      setResult({ correctCount: data.correctCount, pointsEarned: data.pointsEarned });
+      setResult({ correctCount: data.correctCount, pointsEarned: data.pointsEarned, challengeMet: data.dailyChallenge?.newlyCompleted });
       onComplete(data);
     } catch {
       // Non-fatal — the quiz UI still shows what was answered locally.
@@ -78,13 +84,21 @@ export default function NaijaNightSchool({
   }
 
   if (alreadyPlayed && !result) {
+    const met = challenge && previousScore !== null && previousScore >= challenge.minCorrect;
     return (
       <div className="glass-strong rounded-2xl p-10 text-center">
         <GraduationCap size={28} className="text-brand-cyan mx-auto mb-3" />
         <p className="font-serif text-2xl font-semibold mb-1">Tonight&rsquo;s class is done</p>
-        <p className="text-inkdim text-sm">
+        <p className="text-inkdim text-sm mb-3">
           You scored <span className="text-ink font-semibold">{previousScore} / 5</span> today. New round tomorrow.
         </p>
+        {challenge && (
+          <p className="text-xs">
+            <span className={met ? "text-brand-green font-semibold" : "text-inkdim"}>
+              {met ? `Challenge complete: +${challenge.bonus} \u2713` : `Challenge not met: ${challenge.label}`}
+            </span>
+          </p>
+        )}
       </div>
     );
   }
@@ -96,7 +110,12 @@ export default function NaijaNightSchool({
         <div className="text-4xl mb-3">{perfect ? "\u{1F393}" : result.correctCount >= 3 ? "\u{1F44F}" : "\u{1F4DA}"}</div>
         <p className="font-serif text-3xl font-semibold mb-2">{result.correctCount} / 5 correct</p>
         <p className="text-brand-cyan font-semibold mb-1">+{result.pointsEarned} points</p>
-        <p className="text-inkdim text-sm">{perfect ? "Perfect round — top marks." : "Come back tomorrow for a new round."}</p>
+        <p className="text-inkdim text-sm mb-2">{perfect ? "Perfect round — top marks." : "Come back tomorrow for a new round."}</p>
+        {challenge && (
+          <p className={`text-xs font-medium ${result.challengeMet ? "text-brand-green" : "text-inkdim"}`}>
+            {result.challengeMet ? `Today's challenge complete \u2713` : `Today's challenge: ${challenge.label}`}
+          </p>
+        )}
       </motion.div>
     );
   }
@@ -106,6 +125,17 @@ export default function NaijaNightSchool({
 
   return (
     <div className="glass-strong rounded-2xl p-6 sm:p-8">
+      {challenge && (
+        <div className="glass rounded-lg px-4 py-2.5 flex items-center gap-3 mb-5">
+          <span
+            className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0"
+            style={{ color: DIFFICULTY_COLOR[challenge.difficulty], background: `${DIFFICULTY_COLOR[challenge.difficulty]}1a` }}
+          >
+            {challenge.difficulty}
+          </span>
+          <span className="text-xs text-inkdim">Today&rsquo;s Challenge: <span className="text-ink font-medium">{challenge.label}</span></span>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-brand-cyan">
           <GraduationCap size={15} /> {q.category}
